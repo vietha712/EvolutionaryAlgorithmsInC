@@ -1,5 +1,5 @@
 # Utilities
-PROJ := de
+PROJ := aeDE
 
 # Problem
 PROBLEM := rastrigin_20d
