@@ -7,6 +7,8 @@
 
 double func(double *);
 int usage(char *);
+inline double getCurrentToBest(double *, double *, double *, double *, double *);
+inline double getRand1(double *, double *, double *, double *);
 
 /* Random number generator defined by URAND should return
    double-precision floating-point values uniformly distributed
@@ -17,6 +19,9 @@ int usage(char *);
 /* Definition for random number generator initialization	*/
 
 #define INITRAND srand(time(0))
+
+/* Definition for a threshold of mutation scheme */
+#define THRESHOLD (double)0.01
 
 /* Usage for the program	*/
 
@@ -31,15 +36,25 @@ int usage(char *str)
    exit(-1);
 }
 
+inline double getCurrentToBest(double *pCurrent, double *pBest, double *pRand1, double *pRand2, double *pF)
+{
+   return (*pCurrent + (*pF)*(*pRand1 - *pRand2) + (*pF)*(*pBest - *pCurrent));
+}
+
+inline double getRand1(double *pRand1, double *pRand2, double *pRand3, double *pF)
+{
+   return (*pRand1 + (*pF)*(*pRand2 - *pRand3));
+}
 
 int main(int argc, char **argv)
 {
-   register int i, j, l, k, r1, r2, best, jrand, numOfFuncEvals = 0;
+   register int i, j, l, k, r1, r2, r3, best, jrand, numOfFuncEvals = 0;
    extern int D;
    extern double Xl[], Xu[];
    int NP = 20*D, Gmax = 1000, c, index = -1, s = 1;
    double **pPop, **pNext, **ptr, *iptr, *U;
-   double CR = 0.9, F = 0.9, minValue = DBL_MAX, totaltime = 0.0;
+   double CR = 0.9, F = 0.9, delta = 0.0, minValue = DBL_MAX, totaltime = 0.0,
+          fMean = 0.0;
    char *ofile = NULL;
    FILE *fid;
    clock_t startTime, endTime;
@@ -125,7 +140,7 @@ int main(int argc, char **argv)
       for (j = 0; j < D; j++)
          pPop[i][j] = Xl[j] + (Xu[j] - Xl[j])*URAND;
 
-      pPop[i][D] = func(pPop[i]);
+      pPop[i][D] = func(pPop[i]); /* first round evaluation */
       numOfFuncEvals++;
 
       pNext[i] = (double *)malloc((D+1)*sizeof(double));
@@ -143,64 +158,84 @@ int main(int argc, char **argv)
       for (i = 0; i < NP; i++)	/* Going through whole population	*/
       {
 
-        /* Selecting random r1, r2, and r3 to individuals of
-           the population such that i != r1 != r2 != r3	*/
-        do
-        {
-           r1 = (int)(NP*URAND);
-        } while(r1 == i);
+         /* Selecting random r1, r2, and r3 to individuals of
+            the population such that i != r1 != r2	*/
+         do
+         {
+            r1 = (int)(NP*URAND);
+         } while(r1 == i);
+ 
+         do
+         {
+            r2 = (int)(NP*URAND);
+         } while((r2 == i) || (r2 == r1));
 
-        do
-        {
-           r2 = (int)(NP*URAND);
-        } while(r2 == i || r2 == r1);
+         do
+         {
+            r3 = (int)(NP*URAND);
+         } while((r3 == i) || (r3 == r1) || (r3 == r2));
 
-        /* Find best value */
-        for (l = 0; l < NP; l++)
-        {
+         /* Find best individual and 
+         calculate the mean value of objective function */
+         for (fMean = 0.0, minValue = DBL_MAX, l = 0; l < NP; l++)
+         {
             if (pPop[l][D] < minValue)
             {
-                minValue = pPop[l][D];
-                best = l;
+               minValue = pPop[l][D];
+               best = l; /* best individual to */
             }
-        }
+            fMean += pPop[l][D];
+         }
 
-        jrand = (int)(D*URAND);
+         jrand = (int)(D*URAND);
 
-        /* Mutation and crossover	*/
-        for (j = 0; j < D; j++)
-        {
-           if (URAND < CR || j == jrand)
-           {
-              U[j] = pPop[i][j] + F*(pPop[r1][j] - pPop[r2][j]) + F*(pPop[best][j] - pPop[i][j]);
-           }
-           else
-              U[j] = pPop[i][j];
-        }
+         /* minValue is the best value from objective function in considered population */
+         fMean /= NP;
+         delta = ((fMean/minValue) - 1.0f);
 
-        U[D] = func(U);
-        numOfFuncEvals++;
+         /* Crossover */
+         for (j = 0; j < D; j++)
+         {
+            if ((URAND < CR) || (j == jrand))
+            {
+               /* Mutation schemes */
+               if (delta > THRESHOLD)
+               {
+                  U[j] = getRand1(&pPop[r1][j], &pPop[r2][j], &pPop[r3][j], &F);
+               }
+               else
+               {
+                  U[j] = getCurrentToBest(&pPop[i][j], &pPop[best][j], &pPop[r1][j], &pPop[r2][j], &F);
+               }
+            }
+            else
+            {
+               U[j] = pPop[i][j];
+            }
+         }
 
-        /* Comparing the trial vector 'U' and the old individual
-           'pNext[i]' and selecting better one to continue in the
-           Next Population.	*/
-        if (U[D] <= pPop[i][D])
-        {
-           iptr = U;
-           U = pNext[i];
-           pNext[i] = iptr;
-        }
-        else
-        {
-            for (j = 0; j <= D; j++)
-                pNext[i][j] = pPop[i][j];
-        }
+         U[D] = func(U);
+         numOfFuncEvals++;
+
+         /* Comparing the trial vector 'U' and the old individual
+            'pNext[i]' and selecting better one to continue in the
+            Next Population.	*/
+         if (U[D] <= pPop[i][D])
+         {
+            iptr = U;
+            U = pNext[i];
+            pNext[i] = iptr;
+         }
+         else
+         {
+             for (j = 0; j <= D; j++)
+                 pNext[i][j] = pPop[i][j];
+         }
 
       }	/* End of the going through whole population	*/
 
 
       /* Pointers of old and new population are swapped	*/
-
       ptr = pPop;
       pPop = pNext;
       pNext = ptr;
@@ -246,7 +281,6 @@ int main(int argc, char **argv)
    }
 
    /* Printing out information about optimization process for the user	*/
-
    printf("Execution time: %.3f s\n", totaltime / (double)CLOCKS_PER_SEC);
    printf("Number of objective function evaluations: %d\n", numOfFuncEvals);
 
