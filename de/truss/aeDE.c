@@ -17,6 +17,10 @@ inline double getRand1(double *, double *, double *, double *);
 
 #define URAND	((double)rand()/((double)RAND_MAX + 1.0))
 
+#define FRAND  (((double)rand()/(double)RAND_MAX) * 0.6 + 0.4) // [0.4 to 1]
+
+#define CRRAND  (((double)rand()/(double)RAND_MAX) * 0.3 + 0.7) // [0.7 to 1]
+
 float RandomBetween(float smallNumber, float bigNumber)
 {
     float diff = bigNumber - smallNumber;
@@ -105,7 +109,7 @@ int main(int argc, char **argv)
    extern double Xl[], Xu[];
    int NP = 20*D, maxIter = 2000, lenOfUnionSet = NP*2, c, index = -1, s = 1;
    double **pPop, **pNext, **ptr, **U, **unionSet, *sortedArray;
-   double CR = 0.7, F = 0.5, delta = 0.0, tolerance = 0.0000001, minValue = DBL_MAX, totaltime = 0.0,
+   double CR, F, delta = 0.0, tolerance = 0.0000001, minValue = DBL_MAX, totaltime = 0.0,
           fMean = 0.0;
    char *ofile = NULL;
    FILE *fid;
@@ -212,6 +216,8 @@ int main(int argc, char **argv)
    {
       for (i = 0; i < NP; i++)	/* Going through whole population	*/
       {
+         CR = CRRAND;
+         F = FRAND;
 
          /* Selecting random r1, r2 to individuals of
             the population such that i != r1 != r2	*/
