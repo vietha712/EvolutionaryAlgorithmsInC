@@ -14,7 +14,7 @@ INCLUDES := $(INC_PATH)
 
 # Compiler
 CC := gcc
-CC_OPT := -Wall -pedantic -g -O -funroll-loops
+CC_OPT := -Wall -pedantic -O3 -funroll-loops
 
 # Search paths
 vpath %.c $(SRC_PATH)
@@ -48,4 +48,4 @@ run:
 	@echo "Executing program"
 	@echo "Outcome can be found below"
 	@echo ""
-	@$(OUTPUT_PATH)/*.exe
+	@$(OUTPUT_PATH)/$(PROJ).exe
