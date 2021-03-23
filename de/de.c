@@ -248,7 +248,7 @@ int main(int argc, char **argv)
          else
          {
             for (j = 0; j <= D; j++)
-            pNext[i][j] = pPop[i][j];
+               pNext[i][j] = pPop[i][j];
          }
 
       }	/* End of the going through whole population	*/

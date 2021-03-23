@@ -21,14 +21,17 @@ inline double getRand1(double *, double *, double *, double *);
 #define INITRAND srand(time(0))
 
 /* Definition for a threshold of mutation scheme */
-#define THRESHOLD (double)0.01
+#define THRESHOLD (double)0.001
+
+#define FALSE 0
+#define TRUE 1
 
 /* Usage for the program	*/
 
 int usage(char *str)
 {
    fprintf(stderr,"Usage: %s [-h] [-u] [-s] [-N NP (20*D)] ", str);
-   fprintf(stderr,"[-G Gmax (1000)]\n");
+   fprintf(stderr,"[-G maxIter (1000)]\n");
    fprintf(stderr,"\t[-C crossover constant, CR (0.9)]\n");
    fprintf(stderr,"\t[-F mutation scaling factor, F (0.9)]\n");
    fprintf(stderr,"\t[-o <outputfile>]\n\n");
@@ -46,14 +49,56 @@ inline double getRand1(double *pRand1, double *pRand2, double *pRand3, double *p
    return (*pRand1 + (*pF)*(*pRand2 - *pRand3));
 }
 
+// Function to swap position of elements
+void swap(double *a, double *b) {
+  double t = *a;
+  *a = *b;
+  *b = t;
+}
+
+// Function to partition the array on the basis of pivot element
+double partition(double array[], int low, int high) {
+  
+  // Select the pivot element
+  double pivot = array[high];
+  int i = (low - 1);
+
+  // Put the elements smaller than pivot on the left 
+  // and greater than pivot on the right of pivot
+  for (int j = low; j < high; j++) {
+    if (array[j] <= pivot) {
+      i++;
+      swap(&array[i], &array[j]);
+    }
+  }
+
+  swap(&array[i + 1], &array[high]);
+  return (i + 1);
+}
+
+void quickSort(double array[], int low, int high) {
+   if (low < high) 
+   {
+    // Select pivot position and put all the elements smaller 
+    // than pivot on left and greater than pivot on right
+    double pi = partition(array, low, high);
+
+    // Sort the elements on the left of pivot
+    quickSort(array, low, pi - 1);
+
+    // Sort the elements on the right of pivot
+    quickSort(array, pi + 1, high);
+   }
+}
+
 int main(int argc, char **argv)
 {
-   register int i, j, l, k, r1, r2, r3, best, jrand, numOfFuncEvals = 0;
+   register int i, j, l, k, m, r1, r2, r3, best, jrand, numOfFuncEvals = 0;
    extern int D;
    extern double Xl[], Xu[];
-   int NP = 20*D, Gmax = 1000, c, index = -1, s = 1;
-   double **pPop, **pNext, **ptr, *iptr, *U;
-   double CR = 0.9, F = 0.9, delta = 0.0, minValue = DBL_MAX, totaltime = 0.0,
+   int NP = 20*D, maxIter = 2000, lenOfUnionSet = NP*2, c, index = -1, s = 1;
+   double **pPop, **pNext, **ptr, **U, **unionSet, *sortedArray;
+   double CR = 0.9, F = 0.9, delta = 0.0, tolerance = 0.000001, minValue = DBL_MAX, totaltime = 0.0,
           fMean = 0.0;
    char *ofile = NULL;
    FILE *fid;
@@ -80,7 +125,7 @@ int main(int argc, char **argv)
                 if (++i >= argc)
                    usage(argv[0]);
 
-                Gmax = atoi(argv[i]);
+                maxIter = atoi(argv[i]);
                 break;
          case 'C':
                 if (++i >= argc)
@@ -114,8 +159,8 @@ int main(int argc, char **argv)
 
    /* Printing out information about optimization process for the user	*/
    printf("Program parameters: ");
-   printf("NP = %d, Gmax = %d, CR = %.2f, F = %.2f\n",
-	NP, Gmax, CR, F);
+   printf("NP = %d, maxIter = %d, CR = %.2f, F = %.2f, tolerance = %.6f, threshold = %.4f\n",
+	NP, maxIter, CR, F, tolerance, THRESHOLD);
 
    printf("Dimension of the problem: %d\n", D);
 
@@ -129,31 +174,35 @@ int main(int argc, char **argv)
    pPop = (double **)malloc(NP * sizeof(double *));
    if (NULL == pPop) perror("malloc");
 
-   pNext = (double **)malloc(NP*sizeof(double *));
+   pNext = (double **)malloc(NP * sizeof(double *));
    if (NULL == pNext) perror("malloc");
+
+   /* Allocating memory for a trial vector U	*/
+   U = (double **)malloc(NP * sizeof(double *));
+   if (NULL == U) perror("malloc");
 
    for (i = 0; i < NP; i++)
    {
+      U[i] = (double *)malloc((D+1)*sizeof(double));
+      if (NULL == U[i]) perror("malloc");
+
       pPop[i] = (double *)malloc((D+1)*sizeof(double));
       if (NULL == pPop[i]) perror("malloc");
 
       for (j = 0; j < D; j++)
          pPop[i][j] = Xl[j] + (Xu[j] - Xl[j])*URAND;
 
-      pPop[i][D] = func(pPop[i]); /* first round evaluation */
+      /* Evaluate the fitness for each individual */
+      pPop[i][D] = func(pPop[i]);
       numOfFuncEvals++;
 
       pNext[i] = (double *)malloc((D+1)*sizeof(double));
       if (NULL == pNext[i]) perror("malloc");
-   }
-
-   /* Allocating memory for a trial vector U	*/
-   U = (double *)malloc((D+1)*sizeof(double));
-   if (NULL == U) perror("malloc");
-
+   } /*   for (i = 0; i < NP; i++) */
 
    /* The main loop of the algorithm	*/
-   for (k = 0; k < Gmax; k++)
+   k = 0;
+   do
    {
       for (i = 0; i < NP; i++)	/* Going through whole population	*/
       {
@@ -170,11 +219,6 @@ int main(int argc, char **argv)
             r2 = (int)(NP*URAND);
          } while((r2 == i) || (r2 == r1));
 
-         do
-         {
-            r3 = (int)(NP*URAND);
-         } while((r3 == i) || (r3 == r1) || (r3 == r2));
-
          /* Find best individual and 
          calculate the mean value of objective function */
          for (fMean = 0.0, minValue = DBL_MAX, l = 0; l < NP; l++)
@@ -186,12 +230,12 @@ int main(int argc, char **argv)
             }
             fMean += pPop[l][D];
          }
-
-         jrand = (int)(D*URAND);
-
+         
          /* minValue is the best value from objective function in considered population */
          fMean /= NP;
          delta = ((fMean/minValue) - 1.0f);
+
+         jrand = (int)(D*URAND);
 
          /* Crossover */
          for (j = 0; j < D; j++)
@@ -201,57 +245,108 @@ int main(int argc, char **argv)
                /* Mutation schemes */
                if (delta > THRESHOLD)
                {
-                  U[j] = getRand1(&pPop[r1][j], &pPop[r2][j], &pPop[r3][j], &F);
+                  do
+                  {
+                     r3 = (int)(NP*URAND);
+                  } while((r3 == i) || (r3 == r1) || (r3 == r2));
+
+                  U[i][j] = getRand1(&pPop[r1][j], &pPop[r2][j], &pPop[r3][j], &F);
                }
                else
                {
-                  U[j] = getCurrentToBest(&pPop[i][j], &pPop[best][j], &pPop[r1][j], &pPop[r2][j], &F);
+                  U[i][j] = getCurrentToBest(&pPop[i][j], &pPop[best][j], &pPop[r1][j], &pPop[r2][j], &F);
                }
             }
             else
             {
-               U[j] = pPop[i][j];
+               U[i][j] = pPop[i][j];
             }
          }
 
-         U[D] = func(U);
+         U[i][D] = func(&U[i][0]);
          numOfFuncEvals++;
+      }	/* End of the going through whole population	*/
 
-         /* Comparing the trial vector 'U' and the old individual
-            'pNext[i]' and selecting better one to continue in the
-            Next Population.	*/
-         if (U[D] <= pPop[i][D])
+      /* Comparing the trial vector 'U' and the old individual
+         'pNext[i]' and selecting better one to continue in the
+         Next Population.	*/
+      /* Selection process according alogorithm 1.
+         Q = C U P to search for best individual */
+
+      /* Allocating memory for an union vector Q	*/
+      unionSet = (double **)malloc((NP+NP)*sizeof(double));
+      if (NULL == unionSet) perror("malloc"); // size of trial vector 20 and pPop 20
+
+      for (m = 0; m < (NP+NP); m++)
+      {
+         unionSet[m] = (double *)malloc((D+1)*sizeof(double));
+         if (NULL == unionSet[m]) perror("malloc");
+      }
+
+      /* Copy trial vectors to unionSet */
+      for (m = 0; m < NP; m++)
+      {
+         for (int n = 0; n <= D; n++)
+            unionSet[m][n] = U[m][n];
+      }
+
+      /* Creating union set with target vectors */
+      for (int pos = 0; pos < NP; pos++)
+      {
+
+         if(unionSet[pos][D] == pPop[pos][D])
          {
-            iptr = U;
-            U = pNext[i];
-            pNext[i] = iptr;
+            continue;
          }
          else
          {
-             for (j = 0; j <= D; j++)
-                 pNext[i][j] = pPop[i][j];
+            for (int n = 0; n <= D; n++)
+               unionSet[m][n] = pPop[pos][n];
+            m++;
          }
+      } //faulty
 
-      }	/* End of the going through whole population	*/
+      lenOfUnionSet = m;
+      /* Do sorting over unionSet to find NP best individuals, in this case NP is 400 */
+      /* Copy evaluated output for each set of design variable to new array for sorting */
+      /* Allocating memory for a trial vector U	*/
+      sortedArray = (double *)malloc((lenOfUnionSet)*sizeof(double));
+      if (NULL == sortedArray) perror("malloc");
 
+      for (int copyIndex = 0; copyIndex < lenOfUnionSet; copyIndex++)
+         sortedArray[copyIndex] = unionSet[copyIndex][D];
+
+      quickSort(sortedArray, 0, (lenOfUnionSet - 1));
+
+      /* Matching and copying best individuals to next generation */
+      for (int sortedIndex = 0; sortedIndex < NP; sortedIndex++)
+      {
+         for (int marchingIndex = 0; marchingIndex < lenOfUnionSet; marchingIndex++)
+         {
+            if (sortedArray[sortedIndex] == unionSet[marchingIndex][D])
+            {
+               for (int copyingIndex = 0; copyingIndex <= D; copyingIndex++)
+                  pNext[sortedIndex][copyingIndex] = unionSet[marchingIndex][copyingIndex];
+               break;
+            }
+         }
+      }
 
       /* Pointers of old and new population are swapped	*/
       ptr = pPop;
       pPop = pNext;
       pNext = ptr;
-
-   }	/* End of the main loop		*/
+      k++;
+   } while((delta > tolerance) && (k < maxIter)); /* main loop of aeDE */
 
 
    /* Stopping timer	*/
-
    endTime = clock();
    totaltime = (double)(endTime - startTime);
 
 
    /* If user has defined output file, the whole final pPopation is
       saved to the file						*/
-
    if (ofile != NULL)
    {
       if ((fid=(FILE *)fopen(ofile,"a")) == NULL)
@@ -270,8 +365,7 @@ int main(int argc, char **argv)
    }
 
    /* Finding best individual	*/
-    minValue = DBL_MAX;
-   for (i=0; i < NP; i++)
+   for (minValue = DBL_MAX, i = 0; i < NP; i++)
    {
       if (pPop[i][D] < minValue)
       {
@@ -285,10 +379,6 @@ int main(int argc, char **argv)
    printf("Number of objective function evaluations: %d\n", numOfFuncEvals);
 
    printf("Solution:\nValues of variables: ");
-   /*
-   for (i=0; i < D; i++)
-      printf("%.15f ", pPop[index][i]);*/
-
    printf("\nObjective function value: ");
    printf("%.15f\n", pPop[index][D]);
 
@@ -299,10 +389,16 @@ int main(int argc, char **argv)
    {
       free(pPop[i]);
       free(pNext[i]);
+      free(U[i]);
    }
+   for (i = 0; i < (NP+NP); i++)
+      free(unionSet[i]);
+
    free(pPop);
    free(pNext);
+   free(unionSet);
    free(U);
+   free(sortedArray);
 
    return(0);
 }

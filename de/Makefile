@@ -14,7 +14,7 @@ INCLUDES := $(INC_PATH)
 
 # Compiler
 CC := gcc
-CC_OPT := -Wall -pedantic -ansi -O3 -funroll-loops
+CC_OPT := -Wall -pedantic -g -O -funroll-loops
 
 # Search paths
 vpath %.c $(SRC_PATH)
@@ -40,6 +40,9 @@ build-dir:
 clean:
 	@echo "Cleaning up"
 	@rm -rf  $(OUTPUT_PATH)
+
+debug:
+	gdb $(OUTPUT_PATH)/$(PROJ).exe
 
 run:
 	@echo "Executing program"
