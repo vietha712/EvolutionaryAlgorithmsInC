@@ -3,13 +3,19 @@
 #include <time.h>
 #include <float.h>
 #include <math.h>
+#include <omp.h>
 
 /* Function definitions		*/
 
 double func(double *);
+void fix(double *, int);
 int usage(char *);
 inline double getCurrentToBest(double *, double *, double *, double *, double *);
 inline double getRand1(double *, double *, double *, double *);
+void swap(double *a, double *b);
+double partition(double array[], int low, int high);
+void quickSort(double array[], int low, int high);
+int isArrayIdentical(double array1[], double array2[], int length);
 
 /* Random number generator defined by URAND should return
    double-precision floating-point values uniformly distributed
@@ -20,12 +26,6 @@ inline double getRand1(double *, double *, double *, double *);
 #define FRAND  (((double)rand()/(double)RAND_MAX) * 0.6 + 0.4) // [0.4 to 1]
 
 #define CRRAND  (((double)rand()/(double)RAND_MAX) * 0.3 + 0.7) // [0.7 to 1]
-
-float RandomBetween(float smallNumber, float bigNumber)
-{
-    float diff = bigNumber - smallNumber;
-    return (((float) rand() / RAND_MAX) * diff) + smallNumber;
-}
 
 /* Definition for random number generator initialization	*/
 
@@ -41,7 +41,7 @@ float RandomBetween(float smallNumber, float bigNumber)
 
 int usage(char *str)
 {
-   fprintf(stderr,"Usage: %s [-h] [-u] [-s] [-N NP (20*D)] ", str);
+   fprintf(stderr,"Usage: %s [-h] [-u] [-s] [-N NP (20)] ", str);
    fprintf(stderr,"[-G maxIter (2000)]\n");
    fprintf(stderr,"\t[-C crossover constant, CR (0.9)]\n");
    fprintf(stderr,"\t[-F mutation scaling factor, F (0.9)]\n");
@@ -102,14 +102,34 @@ void quickSort(double array[], int low, int high) {
    }
 }
 
+int isArrayIdentical(double array1[], double array2[], int length)
+{
+   int isIndentical = TRUE;
+
+   for (int i = 0; i < length; i++)
+   {
+      if (array1[i] == array2[i])
+      {
+         continue;
+      }
+      else
+      {
+         isIndentical = FALSE;
+         break;
+      }
+   }
+
+   return isIndentical;
+}
+
 int main(int argc, char **argv)
 {
    register int i, j, l, k, m, r1, r2, r3, best, jrand, numOfFuncEvals = 0;
    extern int D;
    extern double Xl[], Xu[];
-   int NP = 20*D, maxIter = 2000, lenOfUnionSet = NP*2, c, index = -1, s = 1;
-   double **pPop, **pNext, **ptr, **U, **unionSet, *sortedArray;
-   double CR, F, delta = 0.0, tolerance = 0.0000001, minValue = DBL_MAX, totaltime = 0.0,
+   int NP = 20, maxIter = 4000, lenOfUnionSet = NP*2, c, index = -1, s = 1;
+   double **pPop, **pNext, **ptr, **U, **unionSet = NULL, *sortedArray = NULL;
+   double CR = 0.7, F = 0.7, delta = 0.0, tolerance = 0.0000001, minValue = DBL_MAX, totaltime = 0.0,
           fMean = 0.0;
    char *ofile = NULL;
    FILE *fid;
@@ -199,6 +219,7 @@ int main(int argc, char **argv)
       pPop[i] = (double *)malloc((D+1)*sizeof(double));
       if (NULL == pPop[i]) perror("malloc");
 
+      /* Initialization */
       for (j = 0; j < D; j++)
          pPop[i][j] = Xl[j] + (Xu[j] - Xl[j])*URAND;
 
@@ -216,11 +237,13 @@ int main(int argc, char **argv)
    {
       for (i = 0; i < NP; i++)	/* Going through whole population	*/
       {
-         CR = CRRAND;
-         F = FRAND;
+         F = FRAND; // line 5
+         CR = CRRAND; // line 6
+         jrand = (int)(D*URAND); // line 7
 
-         /* Selecting random r1, r2 to individuals of
-            the population such that i != r1 != r2	*/
+         /* Selecting random r1, r2 individuals of
+            the population such that i != r1 != r2	
+            line 11 and 14 */
          do
          {
             r1 = (int)(NP*URAND);
@@ -231,26 +254,24 @@ int main(int argc, char **argv)
             r2 = (int)(NP*URAND);
          } while((r2 == i) || (r2 == r1));
 
-         jrand = (int)(D*URAND);
-
          /* Crossover */
          for (j = 0; j < D; j++)
          {
-            if ((URAND < CR) || (j == jrand))
+            if ((URAND < CR) || (j == jrand)) // line 9 
             {
                /* Mutation schemes */
-               if (delta > THRESHOLD)
+               if (delta > THRESHOLD) // line 10
                {
                   do
                   {
                      r3 = (int)(NP*URAND);
-                  } while((r3 == i) || (r3 == r1) || (r3 == r2));
+                  } while((r3 == i) || (r3 == r1) || (r3 == r2)); // line 11
 
-                  U[i][j] = getRand1(&pPop[r1][j], &pPop[r2][j], &pPop[r3][j], &F);
+                  U[i][j] = getRand1(&pPop[r1][j], &pPop[r2][j], &pPop[r3][j], &F); // line 12
                }
                else
                {
-                  /* Find best individual */
+                  /* Find best individual | line 14 */
                   for (minValue = DBL_MAX, l = 0; l < NP; l++)
                   {
                      if (pPop[l][D] < minValue)
@@ -260,36 +281,36 @@ int main(int argc, char **argv)
                      }
                   }
 
-                  U[i][j] = getCurrentToBest(&pPop[i][j], &pPop[best][j], &pPop[r1][j], &pPop[r2][j], &F);
+                  U[i][j] = getCurrentToBest(&pPop[i][j], &pPop[best][j], &pPop[r1][j], &pPop[r2][j], &F); // line 15
                }
             }
             else
             {
-               U[i][j] = pPop[i][j];
+               U[i][j] = pPop[i][j]; // line 18
             }
          }
 
-         U[i][D] = func(&U[i][0]);
+         U[i][D] = func(&U[i][0]); // Evaluate trial vectors | line 21
          numOfFuncEvals++;
       }	/* End of the going through whole population	*/
 
-      /* Comparing the trial vector 'U' and the old individual
-         'pNext[i]' and selecting better one to continue in the
-         Next Population.	*/
       /* Selection process according alogorithm 1.
          Q = C U P to search for best individual */
 
       /* Allocating memory for an union vector Q	*/
-      unionSet = (double **)malloc((NP+NP)*sizeof(double));
-      if (NULL == unionSet) perror("malloc"); // size of trial vector 20 and pPop 20
-
-      for (m = 0; m < (NP+NP); m++)
+      if (NULL == unionSet)
       {
-         unionSet[m] = (double *)malloc((D+1)*sizeof(double));
-         if (NULL == unionSet[m]) perror("malloc");
+         unionSet = (double **)malloc((NP+NP)*sizeof(double));
+         if (NULL == unionSet) perror("malloc"); // size of trial vector 20 and pPop 20
+
+         for (m = 0; m < (NP+NP); m++)
+         {
+            unionSet[m] = (double *)malloc((D+1)*sizeof(double));
+            if (NULL == unionSet[m]) perror("malloc");
+         }
       }
 
-      /* Copy trial vectors to unionSet */
+      /* Copy trial vectors U to unionSet */
       for (m = 0; m < NP; m++)
       {
          for (int n = 0; n <= D; n++)
@@ -299,9 +320,9 @@ int main(int argc, char **argv)
       /* Creating union set with target vectors */
       for (int pos = 0; pos < NP; pos++)
       {
-         fMean += pPop[pos][D]; //Calculate mean value of objective functions
+         fMean += pPop[pos][D]; // To calculate mean value of objective functions
 
-         if(unionSet[pos][D] == pPop[pos][D])
+         if(isArrayIdentical(&unionSet[pos][0], &pPop[pos][0], D+1))
          {
             continue;
          }
@@ -314,11 +335,14 @@ int main(int argc, char **argv)
       }
 
       lenOfUnionSet = m;
-      /* Do sorting over unionSet to find NP best individuals, in this case NP is 400 */
-      /* Copy evaluated output for each set of design variable to new array for sorting */
-      /* Allocating memory for a trial vector U	*/
-      sortedArray = (double *)malloc((lenOfUnionSet)*sizeof(double));
-      if (NULL == sortedArray) perror("malloc");
+      /* Do sorting over unionSet to find NP best individuals */
+      /* Copy evaluated output for each set of design variables to new array for sorting */
+      /* Allocating memory	*/
+      if (NULL == sortedArray)
+      {
+         sortedArray = (double *)malloc((lenOfUnionSet)*sizeof(double));
+         if (NULL == sortedArray) perror("malloc");
+      }
 
       for (int copyIndex = 0; copyIndex < lenOfUnionSet; copyIndex++)
          sortedArray[copyIndex] = unionSet[copyIndex][D];
@@ -350,11 +374,10 @@ int main(int argc, char **argv)
       k++;
    } while((delta > tolerance) && (k < maxIter)); /* main loop of aeDE */
 
-
+   /* Post aeDE processing */
    /* Stopping timer	*/
    endTime = clock();
    totaltime = (double)(endTime - startTime);
-
 
    /* If user has defined output file, the whole final pPopation is
       saved to the file						*/
