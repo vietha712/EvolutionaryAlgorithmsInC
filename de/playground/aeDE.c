@@ -9,7 +9,6 @@
 
 double func(double *);
 void fix(double *, int);
-int usage(char *);
 inline double getCurrentToBest(double *, double *, double *, double *, double *);
 inline double getRand1(double *, double *, double *, double *);
 void swap(double *a, double *b);
@@ -31,24 +30,15 @@ int isArrayIdentical(double array1[], double array2[], int length);
 
 #define INITRAND srand(time(0))
 
+/* Definition for user settings */
 /* Definition for a threshold of mutation scheme */
 #define THRESHOLD (double)0.00001
+#define TOLERANCE (double)0.000001
+#define NP (int)20
+#define MAXITER (int)4000
 
 #define FALSE 0
 #define TRUE 1
-
-/* Usage for the program	*/
-
-int usage(char *str)
-{
-   fprintf(stderr,"Usage: %s [-h] [-u] [-s] [-N NP (20)] ", str);
-   fprintf(stderr,"[-G maxIter (2000)]\n");
-   fprintf(stderr,"\t[-C crossover constant, CR (0.9)]\n");
-   fprintf(stderr,"\t[-F mutation scaling factor, F (0.9)]\n");
-   fprintf(stderr,"\t[-o <outputfile>]\n\n");
-   fprintf(stderr,"\t-s does not initialize random number generator\n");
-   exit(-1);
-}
 
 inline double getCurrentToBest(double *pCurrent, double *pBest, double *pRand1, double *pRand2, double *pF)
 {
@@ -127,70 +117,20 @@ int main(int argc, char **argv)
    register int i, j, l, k, m, r1, r2, r3, best, jrand, numOfFuncEvals = 0;
    extern int D;
    extern double Xl[], Xu[];
-   int NP = 20, maxIter = 4000, lenOfUnionSet = NP*2, c, index = -1, s = 1;
+   int lenOfUnionSet = NP*2, index = -1, s = 1;
    double **pPop, **pNext, **ptr, **U, **unionSet = NULL, *sortedArray = NULL;
-   double CR = 0.7, F = 0.7, delta = 0.0, tolerance = 0.0000001, minValue = DBL_MAX, totaltime = 0.0,
+   double CR = 0.7, F = 0.7, delta = 0.0, minValue = DBL_MAX, totaltime = 0.0,
           fMean = 0.0;
    char *ofile = NULL;
    FILE *fid;
    clock_t startTime, endTime;
 
-   /* Parse command line arguments given by user	*/
-   for (i = 1; i < argc; i++)
-   {
-      if (argv[i][0] != '-')
-         usage(argv[0]);
-
-      c = argv[i][1];
-
-      switch (c)
-      {
-         case 'N':
-                if (++i >= argc)
-                   usage(argv[0]);
-
-		NP = atoi(argv[i]);
-                break;
-         case 'G':
-                if (++i >= argc)
-                   usage(argv[0]);
-
-                maxIter = atoi(argv[i]);
-                break;
-         case 'C':
-                if (++i >= argc)
-                   usage(argv[0]);
-
-                CR = atof(argv[i]);
-                break;
-         case 'F':
-                if (++i >= argc)
-                   usage(argv[0]);
-
-                F = atof(argv[i]);
-                break;
-         case 'o':
-                if (++i >= argc)
-                   usage(argv[0]);
-
-		ofile = argv[i];
-                break;
-         case 's':	/* Flag for using same seeds for		*/
-                s = 0;	/* different runs				*/
-                break;
-         case 'h':
-         case 'u':
-         default:
-		usage(argv[0]);
-      }
-   }
-
    if (s) INITRAND;
 
    /* Printing out information about optimization process for the user	*/
    printf("Program parameters: ");
-   printf("NP = %d, maxIter = %d, CR = %.2f, F = %.2f, tolerance = %.6f, threshold = %.4f\n",
-	NP, maxIter, CR, F, tolerance, THRESHOLD);
+   printf("NP = %d, maxIter = %d, CR = %.2f, F = %.2f, tolerance = %.6f, threshold = %.6f\n",
+	NP, MAXITER, CR, F, TOLERANCE, THRESHOLD);
 
    printf("Dimension of the problem: %d\n", D);
 
@@ -345,7 +285,7 @@ int main(int argc, char **argv)
       }
 
       for (int copyIndex = 0; copyIndex < lenOfUnionSet; copyIndex++)
-         sortedArray[copyIndex] = unionSet[copyIndex][D];
+         sortedArray[copyIndex] = unionSet[copyIndex][D]; //Sort with the ascending direction. Smallest/best fitness value is the first member.
 
       quickSort(sortedArray, 0, (lenOfUnionSet - 1));
 
@@ -372,7 +312,7 @@ int main(int argc, char **argv)
       pPop = pNext;
       pNext = ptr;
       k++;
-   } while((delta > tolerance) && (k < maxIter)); /* main loop of aeDE */
+   } while((delta > TOLERANCE) && (k < MAXITER)); /* main loop of aeDE */
 
    /* Post aeDE processing */
    /* Stopping timer	*/
@@ -386,7 +326,6 @@ int main(int argc, char **argv)
       if ((fid=(FILE *)fopen(ofile,"a")) == NULL)
       {
          fprintf(stderr,"Error in opening file %s\n\n",ofile);
-         usage(argv[0]);
       }
 
       for (i=0; i < NP; i++)
