@@ -1,8 +1,12 @@
 # Utilities
-PROJ := aeDE
+PROJ := main
 
 # Problem
 PROBLEM := schwefel_20d
+
+# Algorithms
+ALGO := ae_de
+
 #Paths
 OUTPUT_PATH := _build
 INC_PATH :=
@@ -20,7 +24,7 @@ CC_OPT := -Wall -pedantic -O3 -funroll-loops
 vpath %.c $(SRC_PATH)
 
 #OBJECT FILES
-OBJ_FILES := $(OUTPUT_PATH)/$(PROBLEM).o
+OBJ_FILES := $(OUTPUT_PATH)/$(PROBLEM).o $(OUTPUT_PATH)/$(ALGO).o
 
 # Commands
 
@@ -33,6 +37,9 @@ build: $(PROJ).c $(OBJ_FILES)
 
 $(OUTPUT_PATH)/$(PROBLEM).o: $(PROBLEM).c build-dir
 	@$(CC) -c $(CC_OPT) $< -o $(OUTPUT_PATH)/$(PROBLEM).o
+
+$(OUTPUT_PATH)/$(ALGO).o: $(ALGO).c build-dir
+	@$(CC) -c $(CC_OPT) $< -o $(OUTPUT_PATH)/$(ALGO).o
 
 build-dir:
 	@mkdir -p $(OUTPUT_PATH)

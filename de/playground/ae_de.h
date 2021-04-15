@@ -11,7 +11,7 @@
 /* Random number generator defined by URAND should return
    double-precision floating-point values uniformly distributed
    over the interval [0.0, 1.0)					*/
-
+#define MAX_DIMENSION 20
 #define URAND	((double)rand()/((double)RAND_MAX + 1.0))
 
 #define FRAND  (((double)rand()/(double)RAND_MAX) * 0.6 + 0.4) // [0.4 to 1]
@@ -25,8 +25,10 @@
 /* Data structure */
 typedef struct problemTag
 {
-    double upperConstraints[20];
-    double lowerConstraints[20];
+    double upperConstraints[MAX_DIMENSION];
+    double lowerConstraints[MAX_DIMENSION];
+    double optimizedVal[MAX_DIMENSION + 1];
+    double (*penaltyFunc)(double *);
 }problemT;
 
 
@@ -36,7 +38,7 @@ void run_aeDE(int numOfPop,
               float threshHold, 
               float tolerance,
               int varDimension,
-              double (*func)(double *), 
+              problemT *problemCtx,
               int isMinimized);
 
 #endif

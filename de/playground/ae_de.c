@@ -7,7 +7,6 @@
 #include "ae_de.h"
 
 /* Function definitions		*/
-void run_aeDE();
 
 //double func(double *);
 static void fix(double *, int);
@@ -101,9 +100,8 @@ void run_aeDE(int numOfPop,
               float threshHold, 
               float tolerance,
               int varDimension,
-              double (*func)(double *),
-              int isMinimized,
-              double )
+              problemT *problemCtx,
+              int isMinimized)
 {
    register int i, j, l, k, m, r1, r2, r3, best, jrand, numOfFuncEvals = 0;
    //extern double Xl[], Xu[];
@@ -120,7 +118,7 @@ void run_aeDE(int numOfPop,
    /* Printing out information about optimization process for the user	*/
    printf("Program parameters: ");
    printf("numOfPop = %d, maxIter = %d, CR = %.2f, F = %.2f, tolerance = %.6f, threshold = %.6f\n",
-	numOfPop, MAXITER, CR, F, tolerance, threshHold);
+	numOfPop, iter, CR, F, tolerance, threshHold);
 
    printf("Dimension of the problem: %d\n", varDimension);
 
@@ -151,10 +149,12 @@ void run_aeDE(int numOfPop,
 
       /* Initialization */
       for (j = 0; j < varDimension; j++)
-         pPop[i][j] = Xl[j] + (Xu[j] - Xl[j])*URAND;
+         //pPop[i][j] = Xl[j] + (Xu[j] - Xl[j])*URAND;
+         pPop[i][j] = problemCtx->lowerConstraints[j] + 
+                     (problemCtx->upperConstraints[j] - problemCtx->lowerConstraints[j])*URAND;
 
       /* Evaluate the fitness for each individual */
-      pPop[i][varDimension] = func(pPop[i]);
+      pPop[i][varDimension] = problemCtx->penaltyFunc(pPop[i]); //func(pPop[i]);
       numOfFuncEvals++;
 
       pNext[i] = (double *)malloc((varDimension+1)*sizeof(double));
@@ -220,7 +220,7 @@ void run_aeDE(int numOfPop,
             }
          }
 
-         U[i][varDimension] = func(&U[i][0]); // Evaluate trial vectors | line 21
+         U[i][varDimension] = problemCtx->penaltyFunc(&U[i][0]); // Evaluate trial vectors | line 21
          numOfFuncEvals++;
       }	/* End of the going through whole population	*/
 
@@ -302,7 +302,7 @@ void run_aeDE(int numOfPop,
       pPop = pNext;
       pNext = ptr;
       k++;
-   } while((delta > tolerance) && (k < MAXITER)); /* main loop of aeDE */
+   } while((delta > tolerance) && (k < iter)); /* main loop of aeDE */
 
    /* Post aeDE processing */
    /* Stopping timer	*/
