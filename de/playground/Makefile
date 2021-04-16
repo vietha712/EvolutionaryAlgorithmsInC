@@ -5,7 +5,8 @@ PROJ := main
 PROBLEM := rastrigin_20d
 
 # Algorithms
-ALGO := ae_de
+ALGO := parallel_aeDE
+#ae_de
 
 #Paths
 OUTPUT_PATH := _build
@@ -18,7 +19,7 @@ INCLUDES := $(INC_PATH)
 
 # Compiler
 CC := gcc
-CC_OPT := -Wall -pedantic -O3 -funroll-loops
+CC_OPT := -Wall -pedantic -O3 -funroll-loops -fopenmp
 
 # Search paths
 vpath %.c $(SRC_PATH)

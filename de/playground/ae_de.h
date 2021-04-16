@@ -6,7 +6,6 @@
 #include <time.h>
 #include <float.h>
 #include <math.h>
-#include <omp.h>
 
 /*
  * Description: this is a implementation of an adaptive elitist differential evolution
@@ -40,9 +39,9 @@ typedef struct problemTag
 typedef struct resultTag
 {
     double optimizedVars[MAX_DIMENSION];
+    int numOfEvals;
     double executionTime;
     double fitnessVal;
-    int numOfEvals;
 }resultT;
 
 
@@ -55,5 +54,14 @@ void run_aeDE(int numOfPop,
               problemT *problemCtx,
               resultT *result,
               int isMinimized);
+
+void run_parallel_aeDE(int numOfPop,
+                       int iter,
+                       float threshHold, 
+                       float tolerance,
+                       int varDimension,
+                       problemT *problemCtx,
+                       resultT *result,
+                       int isMinimized);
 
 #endif

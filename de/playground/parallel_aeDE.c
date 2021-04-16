@@ -1,4 +1,5 @@
 #include "ae_de.h"
+#include <omp.h>
 
 /* Function definitions		*/
 //static void fix(double *, int);
@@ -87,22 +88,19 @@ static int isArrayIdentical(double array1[], double array2[], int length)
 
 /********************** Exported interface implementation ***************************/
 
-void run_aeDE(int numOfPop,
-              int iter,
-              float threshHold, 
-              float tolerance,
-              int varDimension,
-              problemT *problemCtx,
-              resultT *result,
-              int isMinimized)
+void run_parallel_aeDE(int numOfPop,
+                       int iter,
+                       float threshHold, 
+                       float tolerance,
+                       int varDimension,
+                       problemT *problemCtx,
+                       resultT *result,
+                       int isMinimized)
 {
    register int i, j, l, k, m, r1, r2, r3, best, jrand, numOfFuncEvals = 0;
-   //extern double Xl[], Xu[];
    int lenOfUnionSet = numOfPop*2, index = -1, s = 1;
    double **pPop, **pNext, **ptr, **U, **unionSet = NULL, *sortedArray = NULL;
-   double CR = 0.7, F = 0.7, delta = 0.0, minValue = DBL_MAX, fMean = 0.0;
-   char *ofile = NULL;
-   FILE *fid;
+   double CR = 0.7, F = 0.7, delta = 0.0, minValue = DBL_MAX, fMean = 0.0, totalTime = 0.0;
    clock_t startTime, endTime;
 
    if (s) INITRAND;
@@ -110,8 +108,7 @@ void run_aeDE(int numOfPop,
    /* Printing out information about optimization process for the user	*/
    printf("Program parameters: ");
    printf("numOfPop = %d, maxIter = %d, CR = %.2f, F = %.2f, tolerance = %.6f, threshold = %.6f\n",
-	numOfPop, iter, CR, F, tolerance, threshHold);
-
+	   numOfPop, iter, CR, F, tolerance, threshHold);
    printf("Dimension of the problem: %d\n", varDimension);
 
    /* Starting timer    */
@@ -120,17 +117,14 @@ void run_aeDE(int numOfPop,
    /* Allocating memory for current and next population, intializing
       current population with uniformly distributed random values and
       calculating value for the objective function	*/
-
    pPop = (double **)malloc(numOfPop * sizeof(double *));
    if (NULL == pPop) perror("malloc");
-
    pNext = (double **)malloc(numOfPop * sizeof(double *));
    if (NULL == pNext) perror("malloc");
-
    /* Allocating memory for a trial vector U	*/
    U = (double **)malloc(numOfPop * sizeof(double *));
    if (NULL == U) perror("malloc");
-
+   
    for (i = 0; i < numOfPop; i++)
    {
       U[i] = (double *)malloc((varDimension+1)*sizeof(double));
@@ -140,6 +134,7 @@ void run_aeDE(int numOfPop,
       if (NULL == pPop[i]) perror("malloc");
 
       /* Initialization */
+      #pragma omp parallel for
       for (j = 0; j < varDimension; j++)
          //pPop[i][j] = Xl[j] + (Xu[j] - Xl[j])*URAND;
          pPop[i][j] = problemCtx->lowerConstraints[j] + 
@@ -152,6 +147,7 @@ void run_aeDE(int numOfPop,
       pNext[i] = (double *)malloc((varDimension+1)*sizeof(double));
       if (NULL == pNext[i]) perror("malloc");
    } /*   for (i = 0; i < numOfPop; i++) */
+   
 
    /* The main loop of the algorithm	*/
    k = 0;
@@ -162,7 +158,7 @@ void run_aeDE(int numOfPop,
          F = FRAND; // line 5
          CR = CRRAND; // line 6
          jrand = (int)(varDimension*URAND); // line 7
-
+   
          /* Selecting random r1, r2 individuals of
             the population such that i != r1 != r2	
             line 11 and 14 */
@@ -170,12 +166,12 @@ void run_aeDE(int numOfPop,
          {
             r1 = (int)(numOfPop*URAND);
          } while(r1 == i);
- 
+   
          do
          {
             r2 = (int)(numOfPop*URAND);
          } while((r2 == i) || (r2 == r1));
-
+   
          /* Crossover */
          for (j = 0; j < varDimension; j++)
          {
@@ -188,7 +184,7 @@ void run_aeDE(int numOfPop,
                   {
                      r3 = (int)(numOfPop*URAND);
                   } while((r3 == i) || (r3 == r1) || (r3 == r2)); // line 11
-
+   
                   U[i][j] = getRand1(&pPop[r1][j], &pPop[r2][j], &pPop[r3][j], &F); // line 12
                }
                else
@@ -202,7 +198,7 @@ void run_aeDE(int numOfPop,
                         best = l; /* best individual to */
                      }
                   }
-
+   
                   U[i][j] = getCurrentToBest(&pPop[i][j], &pPop[best][j], &pPop[r1][j], &pPop[r2][j], &F); // line 15
                }
             }
@@ -211,39 +207,39 @@ void run_aeDE(int numOfPop,
                U[i][j] = pPop[i][j]; // line 18
             }
          }
-
+   
          U[i][varDimension] = problemCtx->penaltyFunc(&U[i][0]); // Evaluate trial vectors | line 21
          numOfFuncEvals++;
       }	/* End of the going through whole population	*/
-
+   
       /* Selection process according alogorithm 1.
          Q = C U P to search for best individual */
-
+   
       /* Allocating memory for an union vector Q	*/
       if (NULL == unionSet)
       {
          unionSet = (double **)malloc((numOfPop+numOfPop)*sizeof(double));
          if (NULL == unionSet) perror("malloc"); // size of trial vector 20 and pPop 20
-
+   
          for (m = 0; m < (numOfPop+numOfPop); m++)
          {
             unionSet[m] = (double *)malloc((varDimension+1)*sizeof(double));
             if (NULL == unionSet[m]) perror("malloc");
          }
       }
-
+   
       /* Copy trial vectors U to unionSet */
       for (m = 0; m < numOfPop; m++)
       {
          for (int n = 0; n <= varDimension; n++)
             unionSet[m][n] = U[m][n];
       }
-
+   
       /* Creating union set with target vectors */
       for (int pos = 0; pos < numOfPop; pos++)
       {
          fMean += pPop[pos][varDimension]; // To calculate mean value of objective functions
-
+   
          if(isArrayIdentical(&unionSet[pos][0], &pPop[pos][0], varDimension+1))
          {
             continue;
@@ -255,7 +251,7 @@ void run_aeDE(int numOfPop,
             m++;
          }
       }
-
+   
       lenOfUnionSet = m;
       /* Do sorting over unionSet to find numOfPop best individuals */
       /* Copy evaluated output for each set of design variables to new array for sorting */
@@ -268,9 +264,9 @@ void run_aeDE(int numOfPop,
 
       for (int copyIndex = 0; copyIndex < lenOfUnionSet; copyIndex++)
          sortedArray[copyIndex] = unionSet[copyIndex][varDimension]; //Sort with the ascending direction. Smallest/best fitness value is the first member.
-
+   
       quickSort(sortedArray, 0, (lenOfUnionSet - 1));
-
+   
       /* Matching and copying best individuals to next generation */
       for (int sortedIndex = 0; sortedIndex < numOfPop; sortedIndex++)
       {
@@ -284,11 +280,11 @@ void run_aeDE(int numOfPop,
             }
          }
       }
-
+   
       /* Calculating fMean */
       fMean /= numOfPop;
       delta = fabs(((fMean/sortedArray[0]) - 1));
-
+   
       /* Pointers of old and new population are swapped	*/
       ptr = pPop;
       pPop = pNext;
@@ -300,24 +296,6 @@ void run_aeDE(int numOfPop,
    /* Stopping timer	*/
    endTime = clock();
    result->executionTime = (double)(endTime - startTime)/(double)CLOCKS_PER_SEC;
-
-   /* If user has defined output file, the whole final pPopation is
-      saved to the file						*/
-   if (ofile != NULL)
-   {
-      if ((fid=(FILE *)fopen(ofile,"a")) == NULL)
-      {
-         fprintf(stderr,"Error in opening file %s\n\n",ofile);
-      }
-
-      for (i=0; i < numOfPop; i++)
-      {
-         for (j=0; j <= varDimension; j++)
-            fprintf(fid, "%.15e ", pPop[i][j]);
-         fprintf(fid, "\n");
-      }
-      fclose(fid);
-   }
 
    /* Finding best individual	*/
    for (minValue = DBL_MAX, i = 0; i < numOfPop; i++)
