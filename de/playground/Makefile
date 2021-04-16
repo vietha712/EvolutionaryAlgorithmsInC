@@ -2,14 +2,14 @@
 PROJ := main
 
 # Problem
-PROBLEM := schwefel_20d
+PROBLEM := rastrigin_20d
 
 # Algorithms
 ALGO := ae_de
 
 #Paths
 OUTPUT_PATH := _build
-INC_PATH :=
+INC_PATH := 
 SRC_PATH := src
 
 # Includes

@@ -1,14 +1,6 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include <time.h>
-#include <float.h>
-#include <math.h>
-#include <omp.h>
 #include "ae_de.h"
 
 /* Function definitions		*/
-
-//double func(double *);
 static void fix(double *, int);
 inline double getCurrentToBest(double *, double *, double *, double *, double *);
 inline double getRand1(double *, double *, double *, double *);
@@ -101,14 +93,14 @@ void run_aeDE(int numOfPop,
               float tolerance,
               int varDimension,
               problemT *problemCtx,
+              resultT *result,
               int isMinimized)
 {
    register int i, j, l, k, m, r1, r2, r3, best, jrand, numOfFuncEvals = 0;
    //extern double Xl[], Xu[];
    int lenOfUnionSet = numOfPop*2, index = -1, s = 1;
    double **pPop, **pNext, **ptr, **U, **unionSet = NULL, *sortedArray = NULL;
-   double CR = 0.7, F = 0.7, delta = 0.0, minValue = DBL_MAX, totaltime = 0.0,
-          fMean = 0.0;
+   double CR = 0.7, F = 0.7, delta = 0.0, minValue = DBL_MAX, fMean = 0.0;
    char *ofile = NULL;
    FILE *fid;
    clock_t startTime, endTime;
@@ -307,7 +299,7 @@ void run_aeDE(int numOfPop,
    /* Post aeDE processing */
    /* Stopping timer	*/
    endTime = clock();
-   totaltime = (double)(endTime - startTime);
+   result->executionTime = (double)(endTime - startTime)/(double)CLOCKS_PER_SEC;
 
    /* If user has defined output file, the whole final pPopation is
       saved to the file						*/
@@ -337,16 +329,11 @@ void run_aeDE(int numOfPop,
       }
    }
 
-   /* Printing out information about optimization process for the user	*/
-   printf("Execution time: %.3f s\n", totaltime / (double)CLOCKS_PER_SEC);
-   printf("Number of objective function evaluations: %d\n", numOfFuncEvals);
+   for (int copyingInx = 0; copyingInx <= numOfPop; copyingInx++)
+      result->optimizedVars[copyingInx] = pPop[index][copyingInx];
 
-   printf("Solution:\nValues of variables: ");
-   for (i=0; i < varDimension; i++)
-      printf("%.15f ", pPop[index][i]);
-   printf("\nObjective function value: ");
-   printf("%.15f\n", pPop[index][varDimension]);
-
+   result->fitnessVal = pPop[index][varDimension];
+   result->numOfEvals = numOfFuncEvals;
 
    /* Freeing dynamically allocated memory	*/
 

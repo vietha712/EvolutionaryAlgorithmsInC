@@ -1,6 +1,13 @@
 #ifndef _AE_DE_H_
 #define _AE_DE_H_
 
+#include <stdlib.h>
+#include <stdio.h>
+#include <time.h>
+#include <float.h>
+#include <math.h>
+#include <omp.h>
+
 /*
  * Description: this is a implementation of an adaptive elitist differential evolution
  * for discrete variables and tailor to truss optimization.
@@ -27,9 +34,16 @@ typedef struct problemTag
 {
     double upperConstraints[MAX_DIMENSION];
     double lowerConstraints[MAX_DIMENSION];
-    double optimizedVal[MAX_DIMENSION + 1];
     double (*penaltyFunc)(double *);
 }problemT;
+
+typedef struct resultTag
+{
+    double optimizedVars[MAX_DIMENSION];
+    double executionTime;
+    double fitnessVal;
+    int numOfEvals;
+}resultT;
 
 
 /************************* Exported interface ******************************/
@@ -39,6 +53,7 @@ void run_aeDE(int numOfPop,
               float tolerance,
               int varDimension,
               problemT *problemCtx,
+              resultT *result,
               int isMinimized);
 
 #endif
