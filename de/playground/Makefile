@@ -27,6 +27,9 @@ vpath %.c $(SRC_PATH)
 #OBJECT FILES
 OBJ_FILES := $(OUTPUT_PATH)/$(PROBLEM).o $(OUTPUT_PATH)/$(ALGO).o
 
+#DEFINES
+DEF :=
+
 # Commands
 
 #OUTPUT_PATH/%.o: %.c

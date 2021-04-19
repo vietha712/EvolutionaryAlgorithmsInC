@@ -5,10 +5,13 @@
 //static void fix(double *, int);
 inline double getCurrentToBest(double *, double *, double *, double *, double *);
 inline double getRand1(double *, double *, double *, double *);
+
+#if defined (ELITIST_SELECTION)
 static void swap(double *a, double *b);
 static double partition(double array[], int low, int high);
 static void quickSort(double array[], int low, int high);
 static int isArrayIdentical(double array1[], double array2[], int length);
+#endif
 
 /* Definition for random number generator initialization	*/
 
@@ -24,6 +27,7 @@ inline double getRand1(double *pRand1, double *pRand2, double *pRand3, double *p
    return (*pRand1 + (*pF)*(*pRand2 - *pRand3));
 }
 
+#if defined (ELITIST_SELECTION)
 // Function to swap position of elements
 static void swap(double *a, double *b) {
   double t = *a;
@@ -85,7 +89,7 @@ static int isArrayIdentical(double array1[], double array2[], int length)
 
    return isIndentical;
 }
-
+#endif
 /********************** Exported interface implementation ***************************/
 
 void run_parallel_aeDE(int numOfPop,
@@ -97,11 +101,19 @@ void run_parallel_aeDE(int numOfPop,
                        resultT *result,
                        int isMinimized)
 {
-   register int i, j, l, k, m, r1, r2, r3, best, jrand, numOfFuncEvals = 0;
-   int lenOfUnionSet = numOfPop*2, index = -1, s = 1;
-   double **pPop, **pNext, **ptr, **U, **unionSet = NULL, *sortedArray = NULL;
-   double CR = 0.7, F = 0.7, delta = 0.0, minValue = DBL_MAX, fMean = 0.0, totalTime = 0.0;
+   register int i, j, l, k, r1, r2, r3, best, jrand, numOfFuncEvals = 0;
+   int index = -1, s = 1;
+   double **pPop, *iptr, **pNext, **ptr, **U;
+   double CR = 0.0, F = 0.5, delta = 1.0, minValue = DBL_MAX;
    clock_t startTime, endTime;
+
+#if defined (ELITIST_SELECTION)
+   double fMean = 0.0;
+   double *sortedArray = NULL, **unionSet = NULL;
+   int lenOfUnionSet = numOfPop*2;
+   register int m;
+#endif
+
 
    if (s) INITRAND;
 
@@ -136,12 +148,11 @@ void run_parallel_aeDE(int numOfPop,
       /* Initialization */
       #pragma omp parallel for
       for (j = 0; j < varDimension; j++)
-         //pPop[i][j] = Xl[j] + (Xu[j] - Xl[j])*URAND;
          pPop[i][j] = problemCtx->lowerConstraints[j] + 
                      (problemCtx->upperConstraints[j] - problemCtx->lowerConstraints[j])*URAND;
 
       /* Evaluate the fitness for each individual */
-      pPop[i][varDimension] = problemCtx->penaltyFunc(pPop[i]); //func(pPop[i]);
+      pPop[i][varDimension] = problemCtx->penaltyFunc(pPop[i]);
       numOfFuncEvals++;
 
       pNext[i] = (double *)malloc((varDimension+1)*sizeof(double));
@@ -155,8 +166,8 @@ void run_parallel_aeDE(int numOfPop,
    {
       for (i = 0; i < numOfPop; i++)	/* Going through whole population	*/
       {
-         F = FRAND; // line 5
-         CR = CRRAND; // line 6
+         //F = FRAND; // line 5
+         //CR = CRRAND; // line 6
          jrand = (int)(varDimension*URAND); // line 7
    
          /* Selecting random r1, r2 individuals of
@@ -210,8 +221,26 @@ void run_parallel_aeDE(int numOfPop,
    
          U[i][varDimension] = problemCtx->penaltyFunc(&U[i][0]); // Evaluate trial vectors | line 21
          numOfFuncEvals++;
+
+#if !defined (ELITIST_SELECTION)
+         /* Comparing the trial vector 'U' and the old individual
+            'pNext[i]' and selecting better one to continue in the
+            Next Population.	*/
+         if (U[i][varDimension] <= pPop[i][varDimension])
+         {
+            iptr = U[i];
+            U[i] = pNext[i];
+            pNext[i] = iptr;
+         }
+         else
+         {
+            for (j = 0; j <= varDimension; j++)
+               pNext[i][j] = pPop[i][j];
+         }
+#endif /* #if !defined (ELITIST_SELECTION) */
       }	/* End of the going through whole population	*/
-   
+
+#if defined (ELITIST_SELECTION)
       /* Selection process according alogorithm 1.
          Q = C U P to search for best individual */
    
@@ -266,7 +295,7 @@ void run_parallel_aeDE(int numOfPop,
          sortedArray[copyIndex] = unionSet[copyIndex][varDimension]; //Sort with the ascending direction. Smallest/best fitness value is the first member.
    
       quickSort(sortedArray, 0, (lenOfUnionSet - 1));
-   
+
       /* Matching and copying best individuals to next generation */
       for (int sortedIndex = 0; sortedIndex < numOfPop; sortedIndex++)
       {
@@ -280,17 +309,19 @@ void run_parallel_aeDE(int numOfPop,
             }
          }
       }
-   
-      /* Calculating fMean */
-      fMean /= numOfPop;
-      delta = fabs(((fMean/sortedArray[0]) - 1));
+
+	  /* Calculating fMean */
+      //fMean /= numOfPop;
+      //delta = fabs(((fMean/sortedArray[0]) - 1));
+#endif /* #if defined (ELITIST_SELECTION) */
    
       /* Pointers of old and new population are swapped	*/
       ptr = pPop;
       pPop = pNext;
       pNext = ptr;
       k++;
-   } while((delta > tolerance) && (k < iter)); /* main loop of aeDE */
+
+   } while(/*(delta > tolerance) &&*/ (k < iter)); /* main loop of aeDE */
 
    /* Post aeDE processing */
    /* Stopping timer	*/
@@ -314,20 +345,22 @@ void run_parallel_aeDE(int numOfPop,
    result->numOfEvals = numOfFuncEvals;
 
    /* Freeing dynamically allocated memory	*/
-
    for (i=0; i < numOfPop; i++)
    {
       free(pPop[i]);
       free(pNext[i]);
       free(U[i]);
    }
-   for (i = 0; i < (numOfPop+numOfPop); i++)
-      free(unionSet[i]);
 
    free(pPop);
    free(pNext);
-   free(unionSet);
    free(U);
+
+#if defined (ELITIST_SELECTION)
+   for (i = 0; i < (numOfPop+numOfPop); i++)
+      free(unionSet[i]);
    free(sortedArray);
+   free(unionSet);
+#endif
 }
 
