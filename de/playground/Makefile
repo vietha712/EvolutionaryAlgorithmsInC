@@ -29,6 +29,9 @@ OBJ_FILES := $(OUTPUT_PATH)/$(PROBLEM).o $(OUTPUT_PATH)/$(ALGO).o
 
 #DEFINES
 DEF :=
+#-DELITIST_SELECTION
+
+CC_OPT += $(DEF)
 
 # Commands
 

@@ -57,8 +57,6 @@ void run_aeDE(int numOfPop,
 
 void run_parallel_aeDE(int numOfPop,
                        int iter,
-                       float threshHold, 
-                       float tolerance,
                        int varDimension,
                        problemT *problemCtx,
                        resultT *result,

@@ -5,7 +5,7 @@
 #define THRESHOLD (double)0.01
 #define TOLERANCE (double)0.0001
 #define NP (int)20
-#define MAXITER (int)1000
+#define MAXITER (int)2000
 
 double func(double *);
 
@@ -30,7 +30,7 @@ int main(void)
     resultStorage.numOfEvals = 0;
 
 
-    run_parallel_aeDE(NP, MAXITER, THRESHOLD, TOLERANCE, D, &problemDefinitions, &resultStorage, TRUE);
+    run_parallel_aeDE(NP, MAXITER, D, &problemDefinitions, &resultStorage, TRUE);
 
     /* Printing out information about optimization process for the user	*/
     printf("Execution time: %.4f s\n", resultStorage.executionTime);
