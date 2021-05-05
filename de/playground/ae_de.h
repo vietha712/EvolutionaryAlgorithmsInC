@@ -44,6 +44,12 @@ typedef struct resultTag
     double fitnessVal;
 }resultT;
 
+typedef enum mutationSchemeTag
+{
+    RAND_1,
+    CURRENT_TO_BEST,
+}mutationSchemeT;
+
 
 /************************* Exported interface ******************************/
 void run_aeDE(int numOfPop, 

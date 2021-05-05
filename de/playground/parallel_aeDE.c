@@ -8,6 +8,16 @@ inline double getRand1(double *, double *, double *, double *);
 static void swap(double *a, double *b);
 static double partition(double array[], int low, int high);
 static void quickSort(double array[], int low, int high);
+static void executeEvolutionOverOnePop(problemT *ctx,
+                                       mutationSchemeT mutationOp,
+                                       double **pPop,
+                                       double **pNext,
+                                       double *U,
+                                       double *F,
+                                       int *numOfEvalsOut,
+                                       double CR,
+                                       int numOfPop, 
+                                       int varDimension);
 
 /* Definition for random number generator initialization	*/
 
@@ -64,6 +74,118 @@ static void quickSort(double array[], int low, int high) {
     quickSort(array, pi + 1, high);
    }
 }
+
+static void executeEvolutionOverOnePop(problemT *ctx,
+                                       mutationSchemeT mutationOp,
+                                       double **pPop,
+                                       double **pNext,
+                                       double *U,
+                                       double *F,
+                                       int *numOfEvalsOut,
+                                       double CR,
+                                       int numOfPop, 
+                                       int varDimension)
+{
+   int popIndex, jrand, numOfEvals;
+   int r1, r2, j;
+   double **ptr, *iptr;
+
+   for (popIndex = 0; popIndex < numOfPop; popIndex++)
+   {
+      jrand = (int)(varDimension*URAND);
+
+      /* Selecting random sub1_r1, sub1_r2 individuals of
+         the population such that popIndex != sub1_r1 != sub1_r2 */
+      do
+      {
+         r1 = (int)(numOfPop*URAND);
+      } while(r1 == popIndex);
+
+      do
+      {
+         r2 = (int)(numOfPop*URAND);
+      } while((r2 == popIndex) || (r2 == r1));
+
+      /* Crossover */
+      for (j = 0; j < varDimension; j++)
+      {
+         if ((URAND < CR) || (j == jrand))
+         {
+            /* Mutation schemes */
+            switch (mutationOp)
+            {
+            case RAND_1:
+            {
+               int r3;
+
+               do
+               {
+                  r3 = (int)(numOfPop*URAND);
+               } while((r3 == popIndex) || (r3 == r1) || (r3 == r2));
+
+               U[j] = getRand1(&pPop[r1][j], 
+                               &pPop[r2][j], 
+                               &pPop[r3][j], 
+                               F);
+
+               break;
+            }
+
+            case CURRENT_TO_BEST:
+            {
+               int bestIndex, bestPop;
+               double minVal;
+               /* Find best individual */
+               for (minVal = DBL_MAX, bestIndex = 0; bestIndex < numOfPop; bestIndex++)
+               {
+                  if (pPop[bestIndex][varDimension] < minVal)
+                  {
+                     minVal = pPop[bestIndex][varDimension];
+                     bestPop = bestIndex; /* best individual to */
+                  }
+               }
+
+               U[j] = getCurrentToBest(&pPop[popIndex][j], 
+                                       &pPop[bestPop][j], 
+                                       &pPop[r1][j], 
+                                       &pPop[r2][j], 
+                                       F);
+               break;
+            }
+            default:
+               break;
+            }
+         }
+         else
+         {
+            U[j] = pPop[popIndex][j];
+         }
+      }
+
+      U[varDimension] = ctx->penaltyFunc(&U[0]); // Evaluate trial vectors
+      numOfEvals++;
+
+      /* Comparing the trial vector 'U' and the old individual
+         'pNext[popIndex]' and selecting better one to continue in the
+         Next Population.	*/
+      if (U[varDimension] <= pPop[popIndex][varDimension])
+      {
+         iptr = U;
+         U = pNext[popIndex];
+         pNext[popIndex] = iptr;
+      }
+      else
+      {
+         for (j = 0; j <= varDimension; j++)
+            pNext[popIndex][j] = pPop[popIndex][j];
+      }
+
+      ptr = pPop;
+      pPop = pNext;
+      pNext = ptr;
+      *numOfEvalsOut = numOfEvals;
+   }
+}
 /********************** Exported interface implementation ***************************/
 
 void run_parallel_aeDE(int numOfPop,
@@ -73,12 +195,11 @@ void run_parallel_aeDE(int numOfPop,
                        resultT *result,
                        int isMinimized)
 {
-   int popIndex, popIndex1, popIndex2, bestIndex, mainIndex, best, jrand1, jrand2, numOfFuncEvals = 0, numOfFuncEvals1 = 0, numOfFuncEvals2 = 0;
-   int sub1_r1, sub1_r2, sub1_r3, sub2_r1, sub2_r2, sub2_r3;
-   int sub1_j, sub2_j, j;
+   int mainIndex, popIndex, numOfFuncEvals = 0, numOfFuncEvals1 = 0, numOfFuncEvals2 = 0;
+   int j;
    int index = -1, s = 1;
-   double **pPop, **pSubPop2, **pSubNext2, **ptrSub2, *U2, *iptrSub2, *sortedArray;
-   double **pSubPop1, **pSubNext1, **ptrSub1, *U1, *iptrSub1;
+   double **pPop, **pSubPop2, **pSubNext2, *U2, *sortedArray;
+   double **pSubPop1, **pSubNext1, *U1;
    double CR = 0.0, F = 0.5, minValue = DBL_MAX;
    clock_t startTime, endTime;
 
@@ -183,138 +304,35 @@ void run_parallel_aeDE(int numOfPop,
    for (mainIndex = 0; mainIndex < iter; mainIndex++)
    {
       /* Population 1 */
-      for (popIndex1 = 0; popIndex1 < (numOfPop/2); popIndex1++)	/* Going through whole population	*/
-      {
-         jrand1 = (int)(varDimension*URAND); // line 7
-   
-         /* Selecting random sub1_r1, sub1_r2 individuals of
-            the population such that popIndex != sub1_r1 != sub1_r2	
-            line 11 and 14 */
-         do
-         {
-            sub1_r1 = (int)((numOfPop/2)*URAND);
-         } while(sub1_r1 == popIndex1);
-   
-         do
-         {
-            sub1_r2 = (int)((numOfPop/2)*URAND);
-         } while((sub1_r2 == popIndex1) || (sub1_r2 == sub1_r1));
+      executeEvolutionOverOnePop(problemCtx,
+                                 RAND_1,
+                                 pSubPop1,
+                                 pSubNext1,
+                                 U1,
+                                 &F,
+                                 &numOfFuncEvals1,
+                                 CR,
+                                 (numOfPop/2),
+                                 varDimension);
 
-         do
-         {
-            sub1_r3 = (int)((numOfPop/2)*URAND);
-         } while((sub1_r3 == popIndex1) || (sub1_r3 == sub1_r1) || (sub1_r3 == sub1_r2));
+      executeEvolutionOverOnePop(problemCtx,
+                                 CURRENT_TO_BEST,
+                                 pSubPop2,
+                                 pSubNext2,
+                                 U2,
+                                 &F,
+                                 &numOfFuncEvals2,
+                                 CR,
+                                 (numOfPop/2),
+                                 varDimension);    
 
-         /* Crossover */
-         for (sub1_j = 0; sub1_j < varDimension; sub1_j++)
-         {
-            if ((URAND < CR) || (sub1_j == jrand1))
-            {
-               /* Mutation schemes */
-               U1[sub1_j] = getRand1(&pSubPop1[sub1_r1][sub1_j], 
-                                     &pSubPop1[sub1_r2][sub1_j], 
-                                     &pSubPop1[sub1_r3][sub1_j], 
-                                     &F);
-            }
-            else
-            {
-               U1[sub1_j] = pSubPop1[popIndex1][sub1_j];
-            }
-         }
-   
-         U1[varDimension] = problemCtx->penaltyFunc(&U1[0]); // Evaluate trial vectors | line 21
-         numOfFuncEvals1++;
+      numOfFuncEvals = numOfFuncEvals1 + numOfFuncEvals2;
+      /* Construct elite pop and update sub-pops */
 
-         /* Comparing the trial vector 'U' and the old individual
-            'pNext[popIndex]' and selecting better one to continue in the
-            Next Population.	*/
-         if (U1[varDimension] <= pSubPop1[popIndex1][varDimension])
-         {
-            iptrSub1 = U1;
-            U1 = pSubNext1[popIndex1];
-            pSubNext1[popIndex1] = iptrSub1;
-         }
-         else
-         {
-            for (sub1_j = 0; sub1_j <= varDimension; sub1_j++)
-               pSubNext1[popIndex1][sub1_j] = pSubPop1[popIndex1][sub1_j];
-         }
-         /* elite strategy to pSubNext populations */
-         ptrSub1 = pSubPop1;
-         pSubPop1 = pSubNext1;
-         pSubNext1 = ptrSub1;
-      }	/* End of the going through sub-population 1*/
-
-      /* Population 2 */
-      for (popIndex2 = 0; popIndex2 < (numOfPop/2); popIndex2++)	/* Going through whole population	*/
-      {
-         jrand2 = (int)(varDimension*URAND); // line 7
-   
-         /* Selecting random sub2_r1, sub2_r2 individuals of
-            the population such that popIndex2 != sub2_r1 != sub2_r2	
-            line 11 and 14 */
-         do
-         {
-            sub2_r1 = (int)((numOfPop/2)*URAND);
-         } while(sub2_r1 == popIndex2);
-   
-         do
-         {
-            sub2_r2 = (int)((numOfPop/2)*URAND);
-         } while((sub2_r2 == popIndex2) || (sub2_r2 == sub2_r1));
-   
-         /* Crossover */
-         for (sub2_j = 0; sub2_j < varDimension; sub2_j++)
-         {
-            if ((URAND < CR) || (sub2_j == jrand2))
-            {
-               /* Mutation schemes */
-               /* Find best individual */
-               for (minValue = DBL_MAX, bestIndex = 0; bestIndex < numOfPop; bestIndex++)
-               {
-                  if (pSubPop2[bestIndex][varDimension] < minValue)
-                  {
-                     minValue = pSubPop2[bestIndex][varDimension];
-                     best = bestIndex; /* best individual to */
-                  }
-
-                  U2[sub2_j] = getCurrentToBest(&pSubPop2[popIndex2][sub2_j], 
-                                                &pPop[best][sub2_j], 
-                                                &pPop[sub2_r1][sub2_j], 
-                                                &pPop[sub2_r2][sub2_j], 
-                                                &F);
-               }
-            }
-            else
-            {
-               U2[sub2_j] = pSubPop2[popIndex2][sub2_j];
-            }
-         }
-   
-         U2[varDimension] = problemCtx->penaltyFunc(&U2[0]); // Evaluate trial vectors | line 21
-         numOfFuncEvals2++;
-
-         /* Comparing the trial vector 'U' and the old individual
-            'pNext[popIndex]' and selecting better one to continue in the
-            Next Population.	*/
-         if (U2[varDimension] <= pSubPop2[popIndex2][varDimension])
-         {
-            iptrSub2 = U2;
-            U2 = pSubNext2[popIndex2];
-            pSubNext2[popIndex2] = iptrSub2;
-         }
-         else
-         {
-            for (sub2_j = 0; sub2_j <= varDimension; sub2_j++)
-               pSubNext2[popIndex2][sub2_j] = pSubPop2[popIndex2][sub2_j];
-         }
-
-         /* elite strategy to pSubNext populations */
-         ptrSub2 = pSubPop2;
-         pSubPop2 = pSubNext2;
-         pSubNext2 = ptrSub2;
-      }	/* End of the going through sub-population 2 */
+      
    }
+
+   /* Calculating and output results */
 
    /* Stopping timer	*/
    endTime = clock();
