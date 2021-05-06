@@ -113,7 +113,6 @@ static void executeEvolutionOverOnePop(problemT *ctx,
 {
    int popIndex, jrand, numOfEvals = 0;
    int r1, r2, r3, j;
-   double **ptr, *iptr;
    int bestIndex, bestPop;
    double minVal;
 
@@ -205,6 +204,52 @@ static void executeEvolutionOverOnePop(problemT *ctx,
    swap2DArray(pPop, pNext, numOfPop, varDimension+1);
    *numOfEvalsOut = numOfEvals;
 }
+
+/*
+ * In: base population / Out: two sub-pops raking by their fitness values
+ */
+static void applyEliteStrategy(double **pBasePop, 
+                               double **pSubPop1, 
+                               double **pSubPop2,
+                               int varDimension,
+                               int numOfBasePop)
+{
+   double *sortedArray;
+   int subPopSize = numOfBasePop / 2;
+
+   sortedArray = (double *)malloc(numOfBasePop*sizeof(double));
+   if (NULL == sortedArray) perror("malloc");
+
+   for (int copyingIndex = 0; copyingIndex < numOfBasePop; copyingIndex++)
+   {
+      sortedArray[copyingIndex] = pBasePop[copyingIndex][varDimension];
+   }
+
+   quickSort(sortedArray, 0, (numOfBasePop - 1));
+
+   /* Good fitness member go to first sub-pop for current-to-best mutation */
+   for (int sortedIndex = 0; sortedIndex < subPopSize; sortedIndex++)
+   {
+      for (int marchingIndex = 0; marchingIndex < numOfBasePop; marchingIndex++)
+      {
+         if (sortedArray[sortedIndex] == pBasePop[marchingIndex][varDimension])
+         {
+            for (int copyingIndex = 0; copyingIndex <= varDimension; copyingIndex++)
+               pSubPop1[sortedIndex][copyingIndex] = pBasePop[marchingIndex][copyingIndex];
+            break;
+         }
+      }
+   }
+
+   /* This sub-pop for rand/1 mutation scheme */
+   for (int copyingIndex = 0; copyingIndex < subPopSize; copyingIndex++)
+   {
+      for(int varIndex = 0; varIndex <= varDimension; varIndex++)
+         pSubPop2[copyingIndex][varIndex] = pBasePop[copyingIndex+subPopSize][varIndex];
+   }
+
+   free(sortedArray);
+}
 /********************** Exported interface implementation ***************************/
 
 void run_parallel_aeDE(int numOfPop,
@@ -218,7 +263,7 @@ void run_parallel_aeDE(int numOfPop,
    int j;
    int index = -1, s = 1;
    int subPopSize = numOfPop / 2;
-   double **pPop, **pSubPop2, **pSubNext2, *U2, *sortedArray;
+   double **pPop, **pElitePop, **pSubPop2, **pSubNext2, *U2;
    double **pSubPop1, **pSubNext1, *U1;
    double CR = 0.0, F = 0.5, minValue = DBL_MAX;
    clock_t startTime, endTime;
@@ -239,6 +284,8 @@ void run_parallel_aeDE(int numOfPop,
       calculating value for the objective function	*/
    pPop = (double **)malloc(numOfPop * sizeof(double *));
    if (NULL == pPop) perror("malloc");
+   pElitePop = (double **)malloc(subPopSize * sizeof(double *));
+   if (NULL == pElitePop) perror("malloc");
    pSubPop1 = (double **)malloc(subPopSize * sizeof(double *));
    if (NULL == pSubPop1) perror("malloc");
    pSubNext1 = (double **)malloc(subPopSize * sizeof(double *));
@@ -274,6 +321,9 @@ void run_parallel_aeDE(int numOfPop,
    /* Allocate mem for sub-pops */
    for (popIndex = 0; popIndex < subPopSize; popIndex++)
    {
+      pElitePop[popIndex] = (double *)malloc((varDimension+1)*sizeof(double));
+      if (NULL == pElitePop[popIndex]) perror("malloc");
+
       pSubPop1[popIndex] = (double *)malloc((varDimension+1)*sizeof(double));
       if (NULL == pSubPop1[popIndex]) perror("malloc");
       pSubPop2[popIndex] = (double *)malloc((varDimension+1)*sizeof(double));
@@ -285,37 +335,7 @@ void run_parallel_aeDE(int numOfPop,
       if (NULL == pSubNext2[popIndex]) perror("malloc");
    }
 
-   sortedArray = (double *)malloc(numOfPop*sizeof(double));
-   if (NULL == sortedArray) perror("malloc");
-
-   for (int copyingIndex = 0; copyingIndex < numOfPop; copyingIndex++)
-   {
-      sortedArray[copyingIndex] = pPop[copyingIndex][varDimension];
-   }
-
-   quickSort(sortedArray, 0, (numOfPop - 1));
-      
-   /* Good fitness member go to first sub-pop for current-to-best mutation */
-   for (int sortedIndex = 0; sortedIndex < subPopSize; sortedIndex++)
-   {
-      for (int marchingIndex = 0; marchingIndex < numOfPop; marchingIndex++)
-      {
-         if (sortedArray[sortedIndex] == pPop[marchingIndex][varDimension])
-         {
-            for (int copyingIndex = 0; copyingIndex <= varDimension; copyingIndex++)
-               pSubPop1[sortedIndex][copyingIndex] = pPop[marchingIndex][copyingIndex];
-            break;
-         }
-      }
-   }
-
-   /* This sub-pop for rand/1 mutation scheme */
-   for (int copyingIndex = 0; copyingIndex < subPopSize; copyingIndex++)
-   {
-      for(int varIndex = 0; varIndex <= varDimension; varIndex++)
-         pSubPop2[copyingIndex][varIndex] = pPop[copyingIndex+subPopSize][varIndex];
-   }
-
+   applyEliteStrategy(pPop, pSubPop1, pSubPop2, varDimension, numOfPop);
 
    /* The main loop of the algorithm	*/
    for (mainIndex = 0; mainIndex < iter; mainIndex++)
@@ -343,9 +363,11 @@ void run_parallel_aeDE(int numOfPop,
                                  subPopSize,
                                  varDimension);  
 
-      numOfFuncEvals = numOfFuncEvals1 + numOfFuncEvals2;
+      numOfFuncEvals += (numOfFuncEvals1 + numOfFuncEvals2);
 
-      /* Construct elite pop and update sub-pops */
+      /**** Construct elite pop and update sub-pops ****/
+
+      /* Merge two sub-pops */
       for (int copyingIndex = 0; copyingIndex < subPopSize; copyingIndex++)
       {
          for (int copyingIndex2 = 0; copyingIndex2 <= varDimension; copyingIndex2++)
@@ -358,6 +380,7 @@ void run_parallel_aeDE(int numOfPop,
             pPop[(copyingIndex+subPopSize)][copyingIndex2] = pSubPop2[copyingIndex][copyingIndex2];
       }
 
+      applyEliteStrategy(pPop, pSubPop1, pSubPop2, varDimension, numOfPop);
    } /* Main loop */
 
    /* Calculating and output results */
@@ -406,6 +429,5 @@ void run_parallel_aeDE(int numOfPop,
    free(pSubPop2);
    free(U1);
    free(U2);
-   free(sortedArray);
 }
 
