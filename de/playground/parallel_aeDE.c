@@ -198,6 +198,7 @@ void run_parallel_aeDE(int numOfPop,
    int mainIndex, popIndex, numOfFuncEvals = 0, numOfFuncEvals1 = 0, numOfFuncEvals2 = 0;
    int j;
    int index = -1, s = 1;
+   int subPopSize = numOfPop / 2;
    double **pPop, **pSubPop2, **pSubNext2, *U2, *sortedArray;
    double **pSubPop1, **pSubNext1, *U1;
    double CR = 0.0, F = 0.5, minValue = DBL_MAX;
@@ -219,14 +220,14 @@ void run_parallel_aeDE(int numOfPop,
       calculating value for the objective function	*/
    pPop = (double **)malloc(numOfPop * sizeof(double *));
    if (NULL == pPop) perror("malloc");
-   pSubPop1 = (double **)malloc((numOfPop/2) * sizeof(double *));
+   pSubPop1 = (double **)malloc(subPopSize * sizeof(double *));
    if (NULL == pSubPop1) perror("malloc");
-   pSubNext1 = (double **)malloc((numOfPop/2) * sizeof(double *));
+   pSubNext1 = (double **)malloc(subPopSize * sizeof(double *));
    if (NULL == pSubNext1) perror("malloc");
 
-   pSubPop2 = (double **)malloc((numOfPop/2) * sizeof(double *));
+   pSubPop2 = (double **)malloc(subPopSize * sizeof(double *));
    if (NULL == pSubPop2) perror("malloc");
-   pSubNext2 = (double **)malloc((numOfPop/2) * sizeof(double *));
+   pSubNext2 = (double **)malloc(subPopSize * sizeof(double *));
    if (NULL == pSubNext2) perror("malloc");
 
    /* Allocating memory for a trial vector U	*/
@@ -235,14 +236,12 @@ void run_parallel_aeDE(int numOfPop,
    U2 = (double *)malloc((varDimension+1)*sizeof(double));
    if (NULL == U2) perror("malloc");
    
-   #pragma omp parallel for
    for (popIndex = 0; popIndex < numOfPop; popIndex++)
    {
       pPop[popIndex] = (double *)malloc((varDimension+1)*sizeof(double));
       if (NULL == pPop[popIndex]) perror("malloc");
 
       /* Initialization */
-      #pragma omp parallel for
       for (j = 0; j < varDimension; j++)
          pPop[popIndex][j] = problemCtx->lowerConstraints[j] + 
                      (problemCtx->upperConstraints[j] - problemCtx->lowerConstraints[j])*URAND;
@@ -254,8 +253,7 @@ void run_parallel_aeDE(int numOfPop,
 
    /* Split to two sub-pops for co-evolution */
    /* Allocate mem for sub-pops */
-   #pragma omp parallel for
-   for (popIndex = 0; popIndex < (numOfPop/2); popIndex++)
+   for (popIndex = 0; popIndex < subPopSize; popIndex++)
    {
       pSubPop1[popIndex] = (double *)malloc((varDimension+1)*sizeof(double));
       if (NULL == pSubPop1[popIndex]) perror("malloc");
@@ -268,7 +266,7 @@ void run_parallel_aeDE(int numOfPop,
       if (NULL == pSubNext2[popIndex]) perror("malloc");
    }
 
-   sortedArray = (double *)malloc((numOfPop)*sizeof(double));
+   sortedArray = (double *)malloc(numOfPop*sizeof(double));
    if (NULL == sortedArray) perror("malloc");
 
    for (int copyingIndex = 0; copyingIndex < numOfPop; copyingIndex++)
@@ -279,7 +277,7 @@ void run_parallel_aeDE(int numOfPop,
    quickSort(sortedArray, 0, (numOfPop - 1));
 
    /* Good fitness member go to first sub-pop for current-to-best mutation */
-   for (int sortedIndex = 0; sortedIndex < (numOfPop/2); sortedIndex++)
+   for (int sortedIndex = 0; sortedIndex < subPopSize; sortedIndex++)
    {
       for (int marchingIndex = 0; marchingIndex < numOfPop; marchingIndex++)
       {
@@ -293,10 +291,10 @@ void run_parallel_aeDE(int numOfPop,
    }
 
    /* This sub-pop for rand/1 mutation scheme */
-   for (int copyingIndex = 0; copyingIndex < (numOfPop/2); copyingIndex++)
+   for (int copyingIndex = 0; copyingIndex < subPopSize; copyingIndex++)
    {
       for(int varIndex = 0; varIndex <= varDimension; varIndex++)
-         pSubPop2[copyingIndex][varIndex] = pPop[copyingIndex+10][varIndex];
+         pSubPop2[copyingIndex][varIndex] = pPop[copyingIndex+subPopSize][varIndex];
    }
 
 
@@ -312,7 +310,7 @@ void run_parallel_aeDE(int numOfPop,
                                  &F,
                                  &numOfFuncEvals1,
                                  CR,
-                                 (numOfPop/2),
+                                 subPopSize,
                                  varDimension);
 
       executeEvolutionOverOnePop(problemCtx,
@@ -323,13 +321,30 @@ void run_parallel_aeDE(int numOfPop,
                                  &F,
                                  &numOfFuncEvals2,
                                  CR,
-                                 (numOfPop/2),
-                                 varDimension);    
+                                 subPopSize,
+                                 varDimension);  
 
       numOfFuncEvals = numOfFuncEvals1 + numOfFuncEvals2;
-      /* Construct elite pop and update sub-pops */
 
-      
+      /* Construct elite pop and update sub-pops */
+      for (int copyingIndex = 0; copyingIndex < subPopSize; copyingIndex++)
+      {
+         for (int copyingIndex2 = 0; copyingIndex2 <= varDimension; copyingIndex2++)
+            pPop[copyingIndex][copyingIndex2] = pSubPop1[copyingIndex][copyingIndex2];
+                                               
+      }
+
+      for (int copyingIndex = 0; copyingIndex < (20); copyingIndex++)
+      {
+         printf("index %d\n", copyingIndex);
+         printf("optimized: %.5f\n", pPop[copyingIndex][varDimension]);
+      }
+
+      for (int copyingIndex = 0; copyingIndex < subPopSize; copyingIndex++)
+      {
+         for (int copyingIndex2 = 0; copyingIndex2 <= varDimension; copyingIndex2++)
+            pPop[(copyingIndex+subPopSize)][copyingIndex2] = pSubPop2[copyingIndex][copyingIndex2];
+      }
    }
 
    /* Calculating and output results */
@@ -352,15 +367,15 @@ void run_parallel_aeDE(int numOfPop,
       result->optimizedVars[copyingInx] = pPop[index][copyingInx];
 
    result->fitnessVal = pPop[index][varDimension];
-   result->numOfEvals = numOfFuncEvals + numOfFuncEvals1 + numOfFuncEvals2;
+   result->numOfEvals = numOfFuncEvals;
 
    /* Freeing dynamically allocated memory	*/
    for (popIndex = 0; popIndex < numOfPop; popIndex++)
    {
       free(pPop[popIndex]);
    }
-
-   for (popIndex = 0; popIndex < (numOfPop/2); popIndex++)
+      
+   for (popIndex = 0; popIndex < subPopSize; popIndex++)
    {
       free(pSubPop1[popIndex]);
       free(pSubPop2[popIndex]);
@@ -369,9 +384,12 @@ void run_parallel_aeDE(int numOfPop,
    }
 
    free(pPop);
-   free(U1);
-   free(U2);
    free(pSubNext1);
    free(pSubNext2);
+   free(pSubPop1);
+   free(pSubPop2);
+   free(U1);
+   free(U2);
+   free(sortedArray);
 }
 
