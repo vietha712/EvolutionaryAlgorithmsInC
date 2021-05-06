@@ -40,7 +40,7 @@ typedef struct resultTag
 {
     double optimizedVars[MAX_DIMENSION];
     int numOfEvals;
-    double executionTime;
+    //double executionTime;
     double fitnessVal;
 }resultT;
 
@@ -66,6 +66,7 @@ void run_parallel_aeDE(int numOfPop,
                        int varDimension,
                        problemT *problemCtx,
                        resultT *result,
+                       double *exeTime,
                        int isMinimized);
 
 #endif

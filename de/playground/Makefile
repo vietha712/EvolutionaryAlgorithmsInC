@@ -19,8 +19,7 @@ INCLUDES := $(INC_PATH)
 
 # Compiler
 CC := gcc
-CC_OPT := -Wall -pedantic -funroll-loops
-#-fopenmp
+CC_OPT := -Wall -pedantic -funroll-loops -O2 -fopenmp
 
 # Search paths
 vpath %.c $(SRC_PATH)

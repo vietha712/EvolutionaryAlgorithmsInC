@@ -1,6 +1,6 @@
 #include "ae_de.h"
 #include <string.h>
-//#include <omp.h>
+#include <omp.h>
 
 /* Function definitions		*/
 //static void fix(double *, int);
@@ -273,6 +273,7 @@ void run_parallel_aeDE(int numOfPop,
                        int varDimension,
                        problemT *problemCtx,
                        resultT *result,
+                       double *exeTime,
                        int isMinimized)
 {
    int mainIndex, popIndex, numOfFuncEvals = 0, numOfFuncEvals1 = 0, numOfFuncEvals2 = 0;
@@ -282,7 +283,7 @@ void run_parallel_aeDE(int numOfPop,
    double **pPop, **pElitePop, **pSubPop2, **pSubNext2, *U2;
    double **pSubPop1, **pSubNext1, *U1;
    double CR = 0.0, F = 0.5, minValue = DBL_MAX;
-   clock_t startTime, endTime;
+   double startTime, endTime;
 
    if (s) INITRAND;
 
@@ -293,7 +294,8 @@ void run_parallel_aeDE(int numOfPop,
    printf("Dimension of the problem: %d\n", varDimension);
 
    /* Starting timer    */
-   startTime = clock();
+   //startTime = clock();
+   startTime = omp_get_wtime();
 
    /* Allocating memory for current and next population, intializing
       current population with uniformly distributed random values and
@@ -356,29 +358,39 @@ void run_parallel_aeDE(int numOfPop,
    /* The main loop of the algorithm	*/
    for (mainIndex = 0; mainIndex < iter; mainIndex++)
    {
-      /* Population 1 */
-      executeEvolutionOverOnePop(problemCtx,
-                                 CURRENT_TO_BEST,
-                                 pSubPop1,
-                                 pSubNext1,
-                                 U1,
-                                 &F,
-                                 &numOfFuncEvals1,
-                                 CR,
-                                 subPopSize,
-                                 varDimension);
+      #pragma omp parallel sections
+      {
 
-      executeEvolutionOverOnePop(problemCtx,
-                                 RAND_1,
-                                 pSubPop2,
-                                 pSubNext2,
-                                 U2,
-                                 &F,
-                                 &numOfFuncEvals2,
-                                 CR,
-                                 subPopSize,
-                                 varDimension);  
+         #pragma omp section
+         {
+            printf ("section 1 id = %d, \n", omp_get_thread_num());
+         executeEvolutionOverOnePop(problemCtx,
+                                    CURRENT_TO_BEST,
+                                    pSubPop1,
+                                    pSubNext1,
+                                    U1,
+                                    &F,
+                                    &numOfFuncEvals1,
+                                    CR,
+                                    subPopSize,
+                                    varDimension);
+         }
 
+         #pragma omp section
+         {
+            printf ("section 2 id = %d, \n", omp_get_thread_num());
+         executeEvolutionOverOnePop(problemCtx,
+                                    RAND_1,
+                                    pSubPop2,
+                                    pSubNext2,
+                                    U2,
+                                    &F,
+                                    &numOfFuncEvals2,
+                                    CR,
+                                    subPopSize,
+                                    varDimension);
+         }
+      }
       numOfFuncEvals += (numOfFuncEvals1 + numOfFuncEvals2);
 
       /**** Construct elite pop and update sub-pops ****/
@@ -405,8 +417,10 @@ void run_parallel_aeDE(int numOfPop,
    /* Calculating and output results */
 
    /* Stopping timer	*/
-   endTime = clock();
-   result->executionTime = (double)(endTime - startTime)/(double)CLOCKS_PER_SEC;
+   //endTime = clock();
+   endTime = omp_get_wtime();
+   //*exeTime = (double)(endTime - startTime)/(double)CLOCKS_PER_SEC;
+   *exeTime = endTime - startTime;
 
    /* Finding best individual	*/
    for (minValue = DBL_MAX, popIndex = 0; popIndex < numOfPop; popIndex++)
