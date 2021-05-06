@@ -1,10 +1,11 @@
 #include "ae_de.h"
-#include <omp.h>
+#include <string.h>
+//#include <omp.h>
 
 /* Function definitions		*/
 //static void fix(double *, int);
-inline double getCurrentToBest(double *, double *, double *, double *, double *);
-inline double getRand1(double *, double *, double *, double *);
+static double getCurrentToBest(double *, double *, double *, double *, double *);
+static double getRand1(double *, double *, double *, double *);
 static void swap(double *a, double *b);
 static double partition(double array[], int low, int high);
 static void quickSort(double array[], int low, int high);
@@ -23,12 +24,12 @@ static void executeEvolutionOverOnePop(problemT *ctx,
 
 #define INITRAND srand(time(0))
 
-inline double getCurrentToBest(double *pCurrent, double *pBest, double *pRand1, double *pRand2, double *pF)
+static double getCurrentToBest(double *pCurrent, double *pBest, double *pRand1, double *pRand2, double *pF)
 {
    return (*pCurrent + (*pF)*(*pRand1 - *pRand2) + (*pF)*(*pBest - *pCurrent));
 }
 
-inline double getRand1(double *pRand1, double *pRand2, double *pRand3, double *pF)
+static double getRand1(double *pRand1, double *pRand2, double *pRand3, double *pF)
 {
    return (*pRand1 + (*pF)*(*pRand2 - *pRand3));
 }
@@ -75,6 +76,30 @@ static void quickSort(double array[], int low, int high) {
    }
 }
 
+static void swapArray(double a[], double b[], int size)
+{
+   for (int i = 0; i < size; i++)
+   {
+      double tmp = a[i];
+      a[i] = b[i];
+      b[i] = tmp;
+   }
+}
+
+static void swap2DArray(double **a, double **b, int outerSize, int innerSize)
+{
+   for (int i = 0; i < outerSize; i++)
+   {
+      for(int j = 0; j < innerSize; j++)
+      {
+         double tmp = a[i][j];
+         a[i][j] = b[i][j];
+         b[i][j] = tmp;
+      }
+
+   }
+}
+
 static void executeEvolutionOverOnePop(problemT *ctx,
                                        mutationSchemeT mutationOp,
                                        double **pPop,
@@ -86,9 +111,11 @@ static void executeEvolutionOverOnePop(problemT *ctx,
                                        int numOfPop, 
                                        int varDimension)
 {
-   int popIndex, jrand, numOfEvals;
-   int r1, r2, j;
+   int popIndex, jrand, numOfEvals = 0;
+   int r1, r2, r3, j;
    double **ptr, *iptr;
+   int bestIndex, bestPop;
+   double minVal;
 
    for (popIndex = 0; popIndex < numOfPop; popIndex++)
    {
@@ -114,46 +141,42 @@ static void executeEvolutionOverOnePop(problemT *ctx,
             /* Mutation schemes */
             switch (mutationOp)
             {
-            case RAND_1:
-            {
-               int r3;
-
-               do
+               case RAND_1:
                {
-                  r3 = (int)(numOfPop*URAND);
-               } while((r3 == popIndex) || (r3 == r1) || (r3 == r2));
-
-               U[j] = getRand1(&pPop[r1][j], 
-                               &pPop[r2][j], 
-                               &pPop[r3][j], 
-                               F);
-
-               break;
-            }
-
-            case CURRENT_TO_BEST:
-            {
-               int bestIndex, bestPop;
-               double minVal;
-               /* Find best individual */
-               for (minVal = DBL_MAX, bestIndex = 0; bestIndex < numOfPop; bestIndex++)
-               {
-                  if (pPop[bestIndex][varDimension] < minVal)
+                  do
                   {
-                     minVal = pPop[bestIndex][varDimension];
-                     bestPop = bestIndex; /* best individual to */
-                  }
+                     r3 = (int)(numOfPop*URAND);
+                  } while((r3 == popIndex) || (r3 == r1) || (r3 == r2));
+
+                  U[j] = getRand1(&pPop[r1][j], 
+                                 &pPop[r2][j], 
+                                 &pPop[r3][j], 
+                                 F);
+
+                  break;
                }
 
-               U[j] = getCurrentToBest(&pPop[popIndex][j], 
-                                       &pPop[bestPop][j], 
-                                       &pPop[r1][j], 
-                                       &pPop[r2][j], 
-                                       F);
-               break;
-            }
-            default:
-               break;
+               case CURRENT_TO_BEST:
+               {
+                  /* Find best individual */
+                  for (minVal = DBL_MAX, bestIndex = 0; bestIndex < numOfPop; bestIndex++)
+                  {
+                     if (pPop[bestIndex][varDimension] < minVal)
+                     {
+                        minVal = pPop[bestIndex][varDimension];
+                        bestPop = bestIndex; /* best individual to */
+                     }
+                  }
+
+                  U[j] = getCurrentToBest(&pPop[popIndex][j], 
+                                          &pPop[bestPop][j], 
+                                          &pPop[r1][j], 
+                                          &pPop[r2][j], 
+                                          F);
+                  break;
+               }
+               default:
+                  break;
             }
          }
          else
@@ -170,21 +193,17 @@ static void executeEvolutionOverOnePop(problemT *ctx,
          Next Population.	*/
       if (U[varDimension] <= pPop[popIndex][varDimension])
       {
-         iptr = U;
-         U = pNext[popIndex];
-         pNext[popIndex] = iptr;
+         swapArray(&U[0], &pNext[popIndex][0], varDimension+1);
       }
       else
       {
          for (j = 0; j <= varDimension; j++)
             pNext[popIndex][j] = pPop[popIndex][j];
       }
-
-      ptr = pPop;
-      pPop = pNext;
-      pNext = ptr;
-      *numOfEvalsOut = numOfEvals;
    }
+
+   swap2DArray(pPop, pNext, numOfPop, varDimension+1);
+   *numOfEvalsOut = numOfEvals;
 }
 /********************** Exported interface implementation ***************************/
 
@@ -275,7 +294,7 @@ void run_parallel_aeDE(int numOfPop,
    }
 
    quickSort(sortedArray, 0, (numOfPop - 1));
-
+      
    /* Good fitness member go to first sub-pop for current-to-best mutation */
    for (int sortedIndex = 0; sortedIndex < subPopSize; sortedIndex++)
    {
@@ -303,7 +322,7 @@ void run_parallel_aeDE(int numOfPop,
    {
       /* Population 1 */
       executeEvolutionOverOnePop(problemCtx,
-                                 RAND_1,
+                                 CURRENT_TO_BEST,
                                  pSubPop1,
                                  pSubNext1,
                                  U1,
@@ -314,7 +333,7 @@ void run_parallel_aeDE(int numOfPop,
                                  varDimension);
 
       executeEvolutionOverOnePop(problemCtx,
-                                 CURRENT_TO_BEST,
+                                 RAND_1,
                                  pSubPop2,
                                  pSubNext2,
                                  U2,
@@ -330,14 +349,7 @@ void run_parallel_aeDE(int numOfPop,
       for (int copyingIndex = 0; copyingIndex < subPopSize; copyingIndex++)
       {
          for (int copyingIndex2 = 0; copyingIndex2 <= varDimension; copyingIndex2++)
-            pPop[copyingIndex][copyingIndex2] = pSubPop1[copyingIndex][copyingIndex2];
-                                               
-      }
-
-      for (int copyingIndex = 0; copyingIndex < (20); copyingIndex++)
-      {
-         printf("index %d\n", copyingIndex);
-         printf("optimized: %.5f\n", pPop[copyingIndex][varDimension]);
+            pPop[copyingIndex][copyingIndex2] = pSubPop1[copyingIndex][copyingIndex2];                         
       }
 
       for (int copyingIndex = 0; copyingIndex < subPopSize; copyingIndex++)
@@ -345,7 +357,8 @@ void run_parallel_aeDE(int numOfPop,
          for (int copyingIndex2 = 0; copyingIndex2 <= varDimension; copyingIndex2++)
             pPop[(copyingIndex+subPopSize)][copyingIndex2] = pSubPop2[copyingIndex][copyingIndex2];
       }
-   }
+
+   } /* Main loop */
 
    /* Calculating and output results */
 
@@ -364,7 +377,10 @@ void run_parallel_aeDE(int numOfPop,
    }
 
    for (int copyingInx = 0; copyingInx <= numOfPop; copyingInx++)
+   {
       result->optimizedVars[copyingInx] = pPop[index][copyingInx];
+   }
+
 
    result->fitnessVal = pPop[index][varDimension];
    result->numOfEvals = numOfFuncEvals;
