@@ -250,6 +250,22 @@ static void applyEliteStrategy(double **pBasePop,
 
    free(sortedArray);
 }
+
+static int isSatisfiedRastrigin(double **pPop, int numOfPop, int varDimension)
+{
+   int isMinimized = 0;
+   /* Checking exit condition */
+   for (int checkIndex = 0; checkIndex < numOfPop; checkIndex++)
+   {
+      if (0.0 == pPop[checkIndex][varDimension])
+      {
+         isMinimized = 1;
+         break;
+      }   
+   }
+
+   return isMinimized;
+}
 /********************** Exported interface implementation ***************************/
 
 void run_parallel_aeDE(int numOfPop,
@@ -381,6 +397,9 @@ void run_parallel_aeDE(int numOfPop,
       }
 
       applyEliteStrategy(pPop, pSubPop1, pSubPop2, varDimension, numOfPop);
+
+      if(1 == isSatisfiedRastrigin(pPop, numOfPop, varDimension))
+         break;
    } /* Main loop */
 
    /* Calculating and output results */
