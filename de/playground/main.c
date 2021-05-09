@@ -4,8 +4,8 @@
 
 #define THRESHOLD (double)0.01
 #define TOLERANCE (double)0.0001
-#define NP (int)20
-#define MAXITER (int)1500
+#define NP (int)30
+#define MAXITER (int)1200
 
 double func(double *);
 
