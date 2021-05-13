@@ -39,7 +39,7 @@ typedef struct problemTag
 typedef struct resultTag
 {
     double optimizedVars[MAX_DIMENSION];
-    int numOfEvals;
+    int iteration;
     double fitnessVal;
     double pad[9];
     double executionTime;

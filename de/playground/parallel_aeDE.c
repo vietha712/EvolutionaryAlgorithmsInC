@@ -18,7 +18,6 @@ static void executeEvolutionOverOnePop(problemT *ctx,
                                        double **pNext,
                                        double *U,
                                        double *F,
-                                       int *numOfEvalsOut,
                                        double CR,
                                        int numOfPop, 
                                        int varDimension);
@@ -114,12 +113,11 @@ static void executeEvolutionOverOnePop(problemT *ctx,
                                        double **pNext,
                                        double *U,
                                        double *F,
-                                       int *numOfEvalsOut,
                                        double CR,
                                        int numOfPop, 
                                        int varDimension)
 {
-   int popIndex, jrand, numOfEvals = 0;
+   int popIndex, jrand;
    int r1, r2, r3, j;
    int bestIndex, bestPop;
    double minVal;
@@ -207,7 +205,6 @@ static void executeEvolutionOverOnePop(problemT *ctx,
       }
 
       U[varDimension] = ctx->penaltyFunc(&U[0]); // Evaluate trial vectors
-      numOfEvals++;
 
       /* Comparing the trial vector 'U' and the old individual
          'pNext[popIndex]' and selecting better one to continue in the
@@ -224,7 +221,6 @@ static void executeEvolutionOverOnePop(problemT *ctx,
    }
 
    swap2DArray(pPop, pNext, numOfPop, varDimension+1);
-   *numOfEvalsOut = numOfEvals;
 }
 
 /*
@@ -320,7 +316,7 @@ void run_parallel_aeDE(int numOfPop,
                        resultT *result,
                        int isMinimized)
 {
-   int mainIndex, popIndex, numOfFuncEvals = 0, numOfFuncEvals1 = 0, numOfFuncEvals2 = 0, numOfFuncEvals3 = 0;
+   int mainIndex, popIndex;
    int j;
    int index = -1, s = 1;
    int subPopSize = numOfPop / 3;
@@ -383,7 +379,6 @@ void run_parallel_aeDE(int numOfPop,
 
       /* Evaluate the fitness for each individual */
       pPop[popIndex][varDimension] = problemCtx->penaltyFunc(pPop[popIndex]);
-      numOfFuncEvals++;
    } /* for (popIndex = 0; popIndex < numOfPop; popIndex++) */
 
    /* Split to two sub-pops for co-evolution */
@@ -421,7 +416,6 @@ void run_parallel_aeDE(int numOfPop,
                                     pSubNext1,
                                     U1,
                                     &F,
-                                    &numOfFuncEvals1,
                                     CR,
                                     subPopSize,
                                     varDimension);
@@ -432,7 +426,6 @@ void run_parallel_aeDE(int numOfPop,
                                     pSubNext2,
                                     U2,
                                     &F,
-                                    &numOfFuncEvals2,
                                     CR,
                                     subPopSize,
                                     varDimension);
@@ -443,11 +436,9 @@ void run_parallel_aeDE(int numOfPop,
                                     pSubNext3,
                                     U3,
                                     &F,
-                                    &numOfFuncEvals3,
                                     CR,
                                     subPopSize,
                                     varDimension);
-      numOfFuncEvals += (numOfFuncEvals1 + numOfFuncEvals2 + numOfFuncEvals3);
 
       /**** Construct elite pop and update sub-pops ****/
 
@@ -499,7 +490,7 @@ void run_parallel_aeDE(int numOfPop,
 
 
    result->fitnessVal = pPop[index][varDimension];
-   result->numOfEvals = numOfFuncEvals;
+   result->iteration = mainIndex;
 
    /* Freeing dynamically allocated memory	*/
    for (popIndex = 0; popIndex < numOfPop; popIndex++)

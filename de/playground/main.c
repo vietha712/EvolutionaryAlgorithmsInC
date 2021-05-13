@@ -27,14 +27,14 @@ int main(void)
 
     resultStorage.executionTime = 0.0;
     resultStorage.fitnessVal = 0.0;
-    resultStorage.numOfEvals = 0;
+    resultStorage.iteration = 0;
 
 
     run_parallel_aeDE(NP, MAXITER, D, &problemDefinitions, &resultStorage, TRUE);
 
     /* Printing out information about optimization process for the user	*/
     printf("Execution time: %.4f s\n", resultStorage.executionTime);
-    printf("Number of objective function evaluations: %d\n", resultStorage.numOfEvals);
+    printf("Stop at iteration: %d\n", resultStorage.iteration);
 
     printf("Solution:\nValues of variables: ");
     for (int i = 0; i < D; i++)
