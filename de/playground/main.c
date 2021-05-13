@@ -4,11 +4,10 @@
 
 #define THRESHOLD (double)0.01
 #define TOLERANCE (double)0.0001
-#define NP (int)30
-#define MAXITER (int)1000
+#define NP (int)60
+#define MAXITER (int)1500
 
 double func(double *);
-
 
 int main(void)
 {
@@ -16,7 +15,6 @@ int main(void)
     extern int D;
     problemT problemDefinitions;
     resultT resultStorage;
-    double exeTime;
 
     for (int i = 0; i < D; i++)
     {
@@ -26,16 +24,16 @@ int main(void)
     }
     problemDefinitions.penaltyFunc = &func;
 
-    //resultStorage.executionTime = 0.0;
+    resultStorage.executionTime = 0.0;
     resultStorage.fitnessVal = 0.0;
-    resultStorage.numOfEvals = 0;
+    resultStorage.iteration = 0;
 
 
-    run_parallel_aeDE(NP, MAXITER, D, &problemDefinitions, &resultStorage, &exeTime, TRUE);
+    run_parallel_aeDE(NP, MAXITER, D, &problemDefinitions, &resultStorage, TRUE);
 
     /* Printing out information about optimization process for the user	*/
-    printf("Execution time: %.4f s\n", exeTime);
-    printf("Number of objective function evaluations: %d\n", resultStorage.numOfEvals);
+    printf("Execution time: %.4f s\n", resultStorage.executionTime);
+    printf("Stop at iteration: %d\n", resultStorage.iteration);
 
     printf("Solution:\nValues of variables: ");
     for (int i = 0; i < D; i++)

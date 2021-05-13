@@ -2,7 +2,7 @@
 PROJ := main
 
 # Problem
-PROBLEM := rastrigin_20d
+PROBLEM := rastrigin_20d_skewed
 
 # Algorithms
 ALGO := parallel_aeDE
@@ -19,7 +19,7 @@ INCLUDES := $(INC_PATH)
 
 # Compiler
 CC := gcc
-CC_OPT := -Wall -pedantic -funroll-loops -O2 -fopenmp
+CC_OPT := -Wall -pedantic -funroll-loops -O3 -fopenmp
 
 # Search paths
 vpath %.c $(SRC_PATH)

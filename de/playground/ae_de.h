@@ -39,15 +39,17 @@ typedef struct problemTag
 typedef struct resultTag
 {
     double optimizedVars[MAX_DIMENSION];
-    int numOfEvals;
-    //double executionTime;
+    int iteration;
     double fitnessVal;
+    double pad[9];
+    double executionTime;
 }resultT;
 
 typedef enum mutationSchemeTag
 {
     RAND_1,
     CURRENT_TO_BEST,
+    BEST_1,
 }mutationSchemeT;
 
 
@@ -66,7 +68,6 @@ void run_parallel_aeDE(int numOfPop,
                        int varDimension,
                        problemT *problemCtx,
                        resultT *result,
-                       double *exeTime,
                        int isMinimized);
 
 #endif
