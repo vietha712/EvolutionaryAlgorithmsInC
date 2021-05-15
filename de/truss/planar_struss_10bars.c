@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <assert.h>
+#include "matrix.h"
 
 #define NUM_OF_ELEMENTS 10
 #define NUM_OF_NODES 6
@@ -12,12 +13,12 @@
 
 void transposeOfTe(double A[2][4], double[4][2]);
 
-/*
-const double A[42] = {1.62, 1.80, 1.99, 2.13, 2.38, 2.62, 2.63, 2.88, 2.93, 3.09, 3.13, 3.38,
+
+const double standard_A[42] = {1.62, 1.80, 1.99, 2.13, 2.38, 2.62, 2.63, 2.88, 2.93, 3.09, 3.13, 3.38,
                       3.47, 3.55, 3.63, 3.84, 3.87, 3.88, 4.18, 4.22, 4.49, 4.59, 4.80, 4.97,
                       5.12, 5.74, 7.22, 7.97, 11.50, 13.50, 13.90, 14.20, 15.50, 16.00, 16.90,
                       18.80, 19.90, 22.00, 22.90, 26.50, 30.00, 33.50}; //Standard cross-sectional areas for design variable
-*/
+
 
 const double preCpted_A[10] = {30, 1.62, 22.9, 13.5, 1.62, 1.62, 7.97, 26.5, 22, 1.8};
 
@@ -40,7 +41,7 @@ inline double getWeight(double A, double matDen, double len)
     return (A * matDen * len);
 }
 
-void fix(double *X, int len)
+void fix(double *X, double *A, int len)
 {
     for (int i = 0; i < len; i++)
     {
@@ -62,80 +63,6 @@ void getTransposeOfTe(double **A, double **B)
             B[i][j] = A[j][i];
 }
 
-void multiplyMatrices(double **firstMatrix,
-                    int firstMatrixRows,
-                    int firstMatrixCols,
-                    double **secondMatrix,
-                    int secondMatrixRows,
-                    int secondMatrixCols,
-                    double **outputMatrix)
-{
-    assert(firstMatrixRows == secondMatrixCols);
-
-    for(int i = 0; i < firstMatrixRows; ++i)
-    {
-        for(int j = 0; j < secondMatrixCols; ++j)
-        {
-            for(int k = 0; k < firstMatrixCols; ++k)
-            {
-                outputMatrix[i][j] = (firstMatrix[i][k] * secondMatrix[k][j]);
-            }
-        }
-    }
-}
-
-void divideMatrices(double **firstMatrix,
-                    int firstMatrixRows,
-                    int firstMatrixCols,
-                    double **secondMatrix,
-                    int secondMatrixRows,
-                    int secondMatrixCols,
-                    double **outputMatrix)
-{
-    assert(firstMatrixRows == secondMatrixCols);
-
-    for(int i = 0; i < firstMatrixRows; ++i)
-    {
-        for(int j = 0; j < secondMatrixCols; ++j)
-        {
-            for(int k = 0; k < firstMatrixCols; ++k)
-            {
-                outputMatrix[i][j] = (firstMatrix[i][k] / secondMatrix[k][j]);
-            }
-        }
-    }
-}
-
-void addMatrices(double **firstMatrix,
-         int firstMatrixRows,
-         int firstMatrixCols,
-         double **secondMatrix,
-         int secondMatrixRows,
-         int secondMatrixCols,
-         double **outputMatrix, 
-         int outputMatrixRows,
-         int outputMatrixCols)
-{
-    assert(firstMatrixRows == secondMatrixRows);
-    assert(firstMatrixCols == secondMatrixCols);
-
-    int i,j;
-    for(i = 0; i < outputMatrixRows; ++i)
-    {
-        for(j = 0; j < outputMatrixCols; ++j)
-        {
-            outputMatrix[i][j] = firstMatrix[i][j] + secondMatrix[i][j];
-        }
-    }
-}
-
-void multiplyScalarMatrix(double scalar, double **matrix, double **output, int numRows, int numCols)
-{
-    for (int i = 0; i < numRows; i++)
-        for (int j = 0; j < numCols; j++)
-            output[i][j] = scalar * matrix[i][j];
-}
-
 const double epsilon_1 = 1.0;
 double epsilon_2 = 20.0;
 int E = 10000000;
@@ -150,7 +77,7 @@ double func(double *A)
     double le;
     int x[2], y[2];
     double l_ij, m_ij;
-    double **Te, **Te_Transpose;
+    double **Te, **Te_Transpose, **invK;
     double **ke2x2, **ke4x4;
     double **matrix2x2_Precomputed, **output2x2, **output4x2, **output4x4; //line 57 in 10 bars
     int index[4];
@@ -159,6 +86,7 @@ double func(double *A)
 
     Te = (double **)malloc(2 * sizeof(double *));
     Te_Transpose = (double **)malloc(4 * sizeof(double *));
+    invK = (double **)malloc(TOTAL_DOF * sizeof(double *));
     ke2x2 = (double **)malloc(2 * sizeof(double *));
     matrix2x2_Precomputed = (double **)malloc(2 * sizeof(double *));
     output2x2 = (double **)malloc(2 * sizeof(double *));
@@ -184,7 +112,11 @@ double func(double *A)
     matrix2x2_Precomputed[0][1] = -1;
     matrix2x2_Precomputed[1][0] = -1;
     matrix2x2_Precomputed[1][1] = 1;
+
+    for (int memIndx = 0; memIndx < TOTAL_DOF; memIndx++)
+        invK[memIndx] = (double *)malloc(TOTAL_DOF*sizeof(double));
     
+
     /* Calculate stiffness matrix */
     for (int i = 0; i < NUM_OF_ELEMENTS; i++)
     {
@@ -228,15 +160,18 @@ double func(double *A)
 
     for (int bc_i = 0; bc_i < 4; bc_i++)
     {
-        int temp = bcDOF[i];
-        for (int zeros_i = 0; zeros_i < TOTAL_DOF, zeros_i++)
+        int temp = bcDOF[bc_i];
+        for (int zeros_i = 0; zeros_i < TOTAL_DOF; zeros_i++)
             K[temp][zeros_i] = 0;
 
         K[temp][temp] = 1;
         F[temp] = bcValue[bc_i];
     }
 
-    //TO BE CONT. Calculate U line 78
+    //Calculate U = K\F. inv(K)*F
+    LU_getInverseMatrix(K, invK, TOTAL_DOF);
 
-    return;
+
+    /* TODO: Deallocate */
+    return 1;
 }
