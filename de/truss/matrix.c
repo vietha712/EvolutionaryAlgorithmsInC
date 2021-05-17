@@ -11,7 +11,7 @@ static double det(int matrixDimension, double** matrix);
 
 static void adjoint(double **A, double **adj, int sizeOfMat);
 
-static void LU(double **pMatrix, int n);
+static void LU(MatrixT *matrix, int n);
 
 /* Static functions */
 static void getCoFactor(double** matrix, 
@@ -130,67 +130,53 @@ static void adjoint(double **A, double **adj, int sizeOfMat)
 
 /* Exposed functions */
 
-void multiplyMatrices(double **firstMatrix,
-                    int firstMatrixRows,
-                    int firstMatrixCols,
-                    double **secondMatrix,
-                    int secondMatrixRows,
-                    int secondMatrixCols,
-                    double **outputMatrix)
+void multiplyMatrices(MatrixT* firstMatrix,
+                      MatrixT* secondMatrix,
+                      MatrixT* outputMatrix)
 {
-    assert(firstMatrixCols == secondMatrixRows);
+    assert(firstMatrix->cols == secondMatrix->rows);
+    outputMatrix->rows = firstMatrix->rows;
+    outputMatrix->cols = secondMatrix->cols;
 
-    for(int i = 0; i < firstMatrixRows; ++i)
+    for(int i = 0; i < firstMatrix->rows; ++i)
     {
-        for(int j = 0; j < secondMatrixCols; ++j)
+        for(int j = 0; j < secondMatrix->cols; ++j)
         {
-            for(int k = 0; k < firstMatrixCols; ++k)
+            for(int k = 0; k < firstMatrix->cols; ++k)
             {
-                outputMatrix[i][j] += (firstMatrix[i][k] * secondMatrix[k][j]);
+                outputMatrix->pMatrix[i][j] += (firstMatrix->pMatrix[i][k] * secondMatrix->pMatrix[k][j]);
             }
         }
     }
 }
 
-void divideMatrices(double **firstMatrix,
-                    int firstMatrixRows,
-                    int firstMatrixCols,
-                    double **secondMatrix,
-                    int secondMatrixRows,
-                    int secondMatrixCols,
-                    double **outputMatrix)
+void addMatrices(MatrixT* firstMatrix,
+                 MatrixT* secondMatrix,
+                 MatrixT* outputMatrix)
 {
-
-}
-
-void addMatrices(double **firstMatrix,
-         int firstMatrixRows,
-         int firstMatrixCols,
-         double **secondMatrix,
-         int secondMatrixRows,
-         int secondMatrixCols,
-         double **outputMatrix, 
-         int outputMatrixRows,
-         int outputMatrixCols)
-{
-    assert(firstMatrixRows == secondMatrixRows);
-    assert(firstMatrixCols == secondMatrixCols);
+    assert(firstMatrix->rows == secondMatrix->rows);
+    assert(firstMatrix->cols == secondMatrix->cols);
+    outputMatrix->rows = firstMatrix->rows;
+    outputMatrix->cols = firstMatrix->cols;
 
     int i,j;
-    for(i = 0; i < outputMatrixRows; ++i)
+    for(i = 0; i < outputMatrix->rows; ++i)
     {
-        for(j = 0; j < outputMatrixCols; ++j)
+        for(j = 0; j < outputMatrix->cols; ++j)
         {
-            outputMatrix[i][j] = firstMatrix[i][j] + secondMatrix[i][j];
+            outputMatrix->pMatrix[i][j] = firstMatrix->pMatrix[i][j] + secondMatrix->pMatrix[i][j];
         }
     }
 }
 
-void multiplyScalarMatrix(double scalar, double **matrix, double **output, int numRows, int numCols)
+void multiplyScalarMatrix(double scalar, MatrixT *matrix, MatrixT *outputMatrix)
 {
-    for (int i = 0; i < numRows; i++)
-        for (int j = 0; j < numCols; j++)
-            output[i][j] = scalar * matrix[i][j];
+    outputMatrix->rows = matrix->rows;
+    outputMatrix->cols = matrix->cols;
+
+    for (int i = 0; i < outputMatrix->rows; i++)
+        for (int j = 0; j < outputMatrix->cols; j++)
+            outputMatrix->pMatrix[i][j] = scalar * matrix->pMatrix[i][j];
 }
 
 int inverse(double **A, double **inverse, int sizeOfMatrixA)
@@ -227,43 +213,33 @@ int inverse(double **A, double **inverse, int sizeOfMatrixA)
     return 1;
 }
 
-void printMatrix(double **matrix, int rows, int cols)
+void printMatrix(MatrixT* matrix)
 {
     unsigned int i, j;
     
     printf("Matrix value:\n");
-    for(i = 0; i < rows; ++i)
+    for(i = 0; i < matrix->rows; ++i)
     {
-        for(j = 0; j < cols; ++j)
-            printf("matrix[%d][%d] = %.3f\n", i, j, matrix[i][j]);
+        for(j = 0; j < matrix->cols; ++j)
+            printf("matrix[%d][%d] = %.15f\n", i, j, matrix->pMatrix[i][j]);
     }
 }
 
-void cleanMatrix(double **matrix, int rows, int cols)
+static void LU(MatrixT *matrix, int n)
 {
-    unsigned int i, j;
-    for(i = 0; i < rows; ++i)
-    {
-        for(j = 0; j < cols; ++j)
-            matrix[i][j] = 0.0;
-    }
-}
+	int i,j,k;
+	double x;
 
-static void LU(double **pMatrix, int n)
-{
-	int i,j,k,m,an,am;
-	float x;
-    
-    for(k=0;k<=n-1;k++)
+    for(k = 0; k <= n - 1; k++)
     {
-	  for(j=k+1;j<=n;j++)
+	  for(j = k + 1; j <= n; j++)
 	  {
-	    x = pMatrix[j][k]/pMatrix[k][k];
-	    for(i=k;i<=n;i++)
+	    x = matrix->pMatrix[j][k] / matrix->pMatrix[k][k];
+	    for(i = k; i <= n; i++)
         {  
-	       pMatrix[j][i]=pMatrix[j][i] - x*pMatrix[k][i];
+	       matrix->pMatrix[j][i] = matrix->pMatrix[j][i] - x * matrix->pMatrix[k][i];
         }
-	    pMatrix[j][k]=x;
+	    matrix->pMatrix[j][k] = x;
 	  }
     } 
 }
@@ -299,35 +275,32 @@ void LUdecomposition(double **a, double **l, double **u, int n)
 }
 
 
-void LU_getInverseMatrix(double **inputMat, double **pInvMat, int dimOfMat)
+void LU_getInverseMatrix(MatrixT *inputMat, MatrixT *outInvMat)
 {
-    double *d, *y, **s, **pLocalLU;
-    int localDim = dimOfMat - 1;
+    double *d, *y;
+    MatrixT localLU, s;
     int i, j;
     double x;
 
-    d = (double *)malloc(dimOfMat * sizeof(double *));
-    y = (double *)malloc(dimOfMat * sizeof(double *));
-    s = (double **)malloc(dimOfMat * sizeof(double *));
-    pLocalLU = (double **)malloc(dimOfMat * sizeof(double *));
-    for(int alloc = 0; alloc < dimOfMat; alloc++)
-    {
-        s[alloc] = (double *)malloc(dimOfMat * sizeof(double *));
-        pLocalLU[alloc] = (double *)malloc(dimOfMat * sizeof(double *));
-    }
+    assert(inputMat->rows == inputMat->cols);
+    int localDim = inputMat->rows - 1;
 
-    for (int copy = 0; copy <= localDim; copy++)
-        for (int copy2 = 0; copy2 <= localDim; copy2++)
-            pLocalLU[copy][copy2] = inputMat[copy][copy2];
+    allocateMatrix(&localLU, inputMat->rows, inputMat->cols);
+    allocateMatrix(&s, inputMat->rows, inputMat->cols);
 
-    // Perform decompose
-    LU(pLocalLU, localDim);
+    d = (double *)malloc(inputMat->rows * sizeof(double *));
+    y = (double *)malloc(inputMat->rows * sizeof(double *));
+
+    copyMatrix(inputMat, &localLU);
+
+    // Perform decomposition
+    LU(&localLU, localDim);
+
+    zerosMatrix(&s);
 
     for (int init = 0; init < localDim; init++)
     {
         y[init] = 0.0;
-        for (int init2 = 0; init2 <= localDim; init2++)
-            s[init][init2] = 0.0;
     }
 
     for(int m = 0; m <= localDim; m++)
@@ -336,41 +309,66 @@ void LU_getInverseMatrix(double **inputMat, double **pInvMat, int dimOfMat)
         {
             d[init] = 0.0;
         }
-	    d[m]=1.0;
+	    d[m] = 1.0;
 
 	    for(i = 0; i <= localDim; i++)
         {
             x = 0.0; 
-	        for(j=0;j<=i-1;j++)
+	        for(j = 0; j <= i - 1; j++)
             {
-                x = x + pLocalLU[i][j]*y[j];
+                x = x + localLU.pMatrix[i][j] * y[j];
             }
  	        y[i] = (d[i]-x);
 	    }
 
 	    for(i = localDim; i >= 0; i--)
         {
-            x=0.0; 
+            x = 0.0; 
 	        for(j = i+1; j <= localDim; j++)
             {
-                x = x + pLocalLU[i][j] * s[j][m];
+                x = x + localLU.pMatrix[i][j] * s.pMatrix[j][m];
             }
- 	        s[i][m]=(y[i]-x)/pLocalLU[i][i];
+ 	        s.pMatrix[i][m] = (y[i]-x)/localLU.pMatrix[i][i];
 	    }
+
 	}
 
     /* Copy results */
-    for (int copy = 0; copy <= localDim; copy++)
-        for (int copy2 = 0; copy2 <= localDim; copy2++)
-            pInvMat[copy][copy2] = s[copy][copy2];
+    copyMatrix(&s, outInvMat);
 
-    for (int i=0; i < dimOfMat; i++)
-    {
-      free(s[i]);
-      free(pLocalLU[i]);
-    }
+    deallocateMatrix(&s);
+    deallocateMatrix(&localLU);
     free(d);
     free(y);
-    free(s);
-    free(pLocalLU);
+}
+
+void allocateMatrix(MatrixT* matrix, int rows, int cols)
+{
+    matrix->rows = rows;
+    matrix->cols = cols;
+
+    matrix->pMatrix = (double **)malloc(matrix->rows * sizeof(double *));
+    for (int i = 0; i < matrix->rows; i++)
+        matrix->pMatrix[i] = (double *)malloc(matrix->cols*sizeof(double));
+}
+
+void deallocateMatrix(MatrixT* matrix)
+{
+    for (int i = 0; i < matrix->rows; i++)
+        free(matrix->pMatrix[i]);
+    free(matrix->pMatrix);
+}
+
+void zerosMatrix(MatrixT* matrix)
+{
+    for (int i = 0; i < matrix->rows; i++)
+        for (int j = 0; j < matrix->cols; j++)
+            matrix->pMatrix[i][j] = 0.0;
+}
+
+void copyMatrix(MatrixT* srcMat, MatrixT* desMat)
+{
+    for (int i = 0; i < srcMat->rows; i++)
+        for (int j = 0; j < srcMat->cols; j++)
+            desMat->pMatrix[i][j] = srcMat->pMatrix[i][j];
 }

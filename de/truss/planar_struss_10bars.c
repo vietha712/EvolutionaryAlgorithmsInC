@@ -84,20 +84,18 @@ double func(double *A)
     int bcDOF[4] = {9, 10, 11, 12};
     double bcValue[4] = {0};
 
-    Te = (double **)malloc(2 * sizeof(double *));
-    Te_Transpose = (double **)malloc(4 * sizeof(double *));
-    invK = (double **)malloc(TOTAL_DOF * sizeof(double *));
-    ke2x2 = (double **)malloc(2 * sizeof(double *));
+    Te = allocate(2, 4);
+    Te_Transpose = allocate(4, 2);
+    invK = allocate(TOTAL_DOF, TOTAL_DOF);
+    ke2x2 = allocate(2, 2);
     matrix2x2_Precomputed = (double **)malloc(2 * sizeof(double *));
-    output2x2 = (double **)malloc(2 * sizeof(double *));
+    output2x2 = allocate(2, 2);
     output4x2 = (double **)malloc(4 * sizeof(double *));
     output4x4 = (double **)malloc(4 * sizeof(double *));
     for (int memIndx = 0; memIndx < 2; memIndx++)
     {
-        ke2x2[memIndx] = (double *)malloc((2)*sizeof(double));
         matrix2x2_Precomputed[memIndx] = (double *)malloc((2)*sizeof(double));
         output2x2[memIndx] = (double *)malloc((2)*sizeof(double));
-        Te[memIndx] = (double *)malloc((4)*sizeof(double));
     }
 
     ke4x4 = (double **)malloc(4 * sizeof(double *));
@@ -106,15 +104,11 @@ double func(double *A)
         ke4x4[memIndx] = (double *)malloc((4)*sizeof(double));
         output4x2[memIndx] = (double *)malloc((2)*sizeof(double));
         output4x2[memIndx] = (double *)malloc((4)*sizeof(double));
-        Te_Transpose[memIndx] = (double *)malloc((2)*sizeof(double));
     }
     matrix2x2_Precomputed[0][0] = 1;
     matrix2x2_Precomputed[0][1] = -1;
     matrix2x2_Precomputed[1][0] = -1;
     matrix2x2_Precomputed[1][1] = 1;
-
-    for (int memIndx = 0; memIndx < TOTAL_DOF; memIndx++)
-        invK[memIndx] = (double *)malloc(TOTAL_DOF*sizeof(double));
     
 
     /* Calculate stiffness matrix */

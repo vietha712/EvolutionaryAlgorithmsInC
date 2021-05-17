@@ -5,34 +5,37 @@
 #include <stdio.h>
 #include <assert.h>
 
+typedef struct MatrixTag
+{
+    int rows;
+    int cols;
+    double** pMatrix;
+} MatrixT;
+
+void allocateMatrix(MatrixT* matrix, int rows, int cols);
+
+void deallocateMatrix(MatrixT* matrix);
+
+void zerosMatrix(MatrixT* matrix);
+
 /*Pass*/
-void multiplyMatrices(double **firstMatrix,
-                      int firstMatrixRows,
-                      int firstMatrixCols,
-                      double **secondMatrix,
-                      int secondMatrixRows,
-                      int secondMatrixCols,
-                      double **outputMatrix);
+void multiplyMatrices(MatrixT* firstMatrix,
+                      MatrixT* secondMatrix,
+                      MatrixT* outputMatrix);
 /*Pass*/
-void addMatrices(double **firstMatrix,
-                 int firstMatrixRows,
-                 int firstMatrixCols,
-                 double **secondMatrix,
-                 int secondMatrixRows,
-                 int secondMatrixCols,
-                 double **outputMatrix, 
-                 int outputMatrixRows,
-                 int outputMatrixCols);          
+void addMatrices(MatrixT* firstMatrix,
+                 MatrixT* secondMatrix,
+                 MatrixT* outputMatrix);       
 
 int inverse(double **A, double **inverse, int sizeOfMatrixA);
 
-void printMatrix(double **matrix, int rows, int cols);
+void printMatrix(MatrixT* matrix);
 
-void cleanMatrix(double **matrix, int rows, int cols);
+void copyMatrix(MatrixT* srcMat, MatrixT* desMat);
 
 void LUdecomposition(double **a, double **l, double **u, int n);
 
 /* Pass */
-void LU_getInverseMatrix(double **pLU, double **pInvMat, int dimOfMat);
+void LU_getInverseMatrix(MatrixT *inputMat, MatrixT *outInvMat);
 
 #endif
