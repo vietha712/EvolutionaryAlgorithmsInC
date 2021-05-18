@@ -11,7 +11,7 @@
 #define TE_NUMCOLS 4
 #define TE_NUMROWs 2
 
-void transposeOfTe(double A[2][4], double[4][2]);
+void getTransposeOfTe(MatrixT* inputMat, MatrixT* outputMat);
 
 
 const double standard_A[42] = {1.62, 1.80, 1.99, 2.13, 2.38, 2.62, 2.63, 2.88, 2.93, 3.09, 3.13, 3.38,
@@ -24,6 +24,8 @@ const double preCpted_A[10] = {30, 1.62, 22.9, 13.5, 1.62, 1.62, 7.97, 26.5, 22,
 
 int element[NUM_OF_ELEMENTS][2] = { {3, 5}, {1, 3}, {4, 6}, {2, 4}, {3, 4}, 
                                     {1, 2}, {4, 5}, {3, 6}, {2, 3}, {1, 4} };
+
+double stress_e[NUM_OF_ELEMENTS] = {0};
 
 int gCoord[2][6] = {{720, 720, 360, 360, 0, 0},
                     {360, 0, 360, 0, 360, 0}};
@@ -75,8 +77,8 @@ double func(double *A)
     double le;
     int x[2], y[2];
     double l_ij, m_ij;
-    MatrixT Te, Te_Transpose, invK, F, productOf_invK_F;
-    MatrixT ke2x2, ke4x4;
+    MatrixT Te, Te_Transpose, invK, F;
+    MatrixT ke2x2, ke4x4, Be, U, disp_e, de_o, productOfBe_de;
     MatrixT matrix2x2_Precomputed, output2x2, output4x2, output4x4; //line 57 in 10 bars
     int index[4];
     int bcDOF[4] = {9, 10, 11, 12};
@@ -87,6 +89,8 @@ double func(double *A)
     allocateMatrix(&ke2x2, 2, 2);
     allocateMatrix(&matrix2x2_Precomputed, 2, 2);
     allocateMatrix(&F, TOTAL_DOF, 1); //12x1
+    allocateMatrix(&Be, 1, 2);
+    allocateMatrix(&disp_e, 4, 1);
 
     matrix2x2_Precomputed[0][0] = 1;
     matrix2x2_Precomputed[0][1] = -1;
@@ -103,15 +107,15 @@ double func(double *A)
         y[0] = gCoord[1][element[i][0]];
         y[1] = gCoord[1][element[i][1]];
 
-        le = sqrt( (x[2] - x[1])^2 + (y[2] - y[1])^2 ); //
+        le = sqrt( (x[1] - x[0])^2 + (y[1] - y[0])^2 ); //
 
         //Compute direction cosin
-        l_ij = (x[2] - x[1])/le;
-        m_ij = (y[2] - y[1])/le;
+        l_ij = (x[1] - x[0])/le;
+        m_ij = (y[1] - y[0])/le;
 
         //Compute transform matrix
-        Te[1][1] = l_ij; Te[1][2] = m_ij; Te[1][3] = 0; Te[1][4] = 0;
-        Te[2][1] = 0; Te[2][2] = 0; Te[2][3] = l_ij; Te[2][4] = m_ij;
+        Te[0][0] = l_ij; Te[0][1] = m_ij; Te[0][2] = 0; Te[0][3] = 0;
+        Te[1][0] = 0; Te[1][1] = 0; Te[1][2] = l_ij; Te[1][3] = m_ij;
 
         // Compute stiffness martix of element line 56
         multiplyScalarMatrix((A[i]*E/le), &matrix2x2_Precomputed, &ke2x2);
@@ -147,9 +151,90 @@ double func(double *A)
 
     //Calculate U = K\F. inv(K)*F
     LU_getInverseMatrix(&K, &invK, TOTAL_DOF);
-    multiplyMatrices(&F, &invK, &productOf_invK_F);
+    multiplyMatrices(&F, &invK, &U);
 
+    //Get absolute value for U
+    MatrixT U_Abs;
+    allocateMatrix(&U_Abs, U.rows, U.cols);
+    for (int abs_i = 0; i < U.rows; abs_i++)
+        for (int abs_j = 0; abs_j < U.cols; abs_j++)
+            U_Abs.pMatrix[abs_i][abs_j] = fabs(U.pMatrix[abs_i][abs_j]);
+        
+    double Cdisp = findMaxMember(&U_Abs) - 2.0;
+    deallocateMatrix(&U_Abs);
 
-    /* TODO: Deallocate */
-    return 1;
+    MatrixT temp;
+    /* Compute stress for each element */
+    for (int i = 0; i < NUM_OF_ELEMENTS; i++)
+    {
+        x[0] = gCoord[0][element[i][0]];
+        x[1] = gCoord[0][element[i][1]];
+        y[0] = gCoord[1][element[i][0]];
+        y[1] = gCoord[1][element[i][1]];
+
+        le = sqrt( (x[1] - x[0])^2 + (y[1] - y[0])^2 ); //
+
+        //Compute direction cosin
+        l_ij = (x[1] - x[0])/le;
+        m_ij = (y[1] - y[0])/le;
+
+        //Compute transform matrix
+        Te[0][0] = l_ij; Te[0][1] = m_ij; Te[0][2] = 0; Te[0][3] = 0;
+        Te[1][0] = 0; Te[1][1] = 0; Te[1][2] = l_ij; Te[1][3] = m_ij;
+
+        //compute strain matrix
+        Be.pMatrix[0][0] = -1/le;
+        Be.pMatrix[0][1] = 1/le;
+        
+        //Compute displacement of each bar
+        index[0] = 2*element[i][0] - 1;
+        index[1] = 2*element[i][0];
+        index[2] = 2*element[i][1] - 1;
+        index[3] = 2*element[i][1];
+        disp_e.pMatrix[0][0] = U[index[0]][0];
+        disp_e.pMatrix[1][0] = U[index[1]][0];
+        disp_e.pMatrix[2][0] = U[index[2]][0];
+        disp_e.pMatrix[3][0] = U[index[3]][0];
+
+        multiplyMatrices(&Te, &disp_e, &de_o);
+        //compute stress of element
+        multiplyMatrices(&Be, &de_o, &productOfBe_de);
+
+        multiplyScalarMatrix(E, &productOfBe_de, &temp); //1x1
+        stress_e[i] = temp.pMatrix[0][0];
+    }
+    double LimitSig = 25000;
+    double maxStress = 0.0;
+    for (int i = 0; i < NUM_OF_ELEMENTS; i++)
+        stress_e[i] = fabs(stress_e[i]);
+
+    for (int i = 0; i < NUM_OF_ELEMENTS; i++)
+    {
+        if(stress_e[i] > maxStress)
+        {
+            maxStress = stress_e[i];
+        }
+    }
+
+    double Csig = maxStress/(LimitSig - 1);
+
+    /* Deallocate */
+    deallocateMatrix(&temp);
+    deallocateMatrix(&Te);
+    deallocateMatrix(&Te_Transpose);
+    deallocateMatrix(&invK);
+    deallocateMatrix(&F);
+    deallocateMatrix(&ke2x2);
+    deallocateMatrix(&ke4x4);
+    deallocateMatrix(&Be);
+    deallocateMatrix(&U);
+    deallocateMatrix(&disp_e);
+    deallocateMatrix(&de_o);
+    deallocateMatrix(&productOfBe_de);
+    deallocateMatrix(&matrix2x2_Precomputed);
+    deallocateMatrix(&output2x2);
+    deallocateMatrix(&output4x2);
+    deallocateMatrix(&output4x4);
+
+    return weight;
 }

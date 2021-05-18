@@ -135,7 +135,11 @@ void multiplyMatrices(MatrixT* firstMatrix,
                       MatrixT* outputMatrix)
 {
     assert(firstMatrix->cols == secondMatrix->rows);
-    allocateMatrix(outputMatrix, firstMatrix->rows, secondMatrix->cols);
+    if (NULL == outInvMat->pMatrix)
+    {
+        allocateMatrix(outputMatrix, firstMatrix->rows, secondMatrix->cols);
+    }
+
     zerosMatrix(outputMatrix);
 
     for(int i = 0; i < firstMatrix->rows; ++i)
@@ -156,7 +160,10 @@ void addMatrices(MatrixT* firstMatrix,
 {
     assert(firstMatrix->rows == secondMatrix->rows);
     assert(firstMatrix->cols == secondMatrix->cols);
-    allocateMatrix(outputMatrix, firstMatrix->rows, firstMatrix->cols);
+    if (NULL == outputMatrix->pMatrix)
+    {
+        allocateMatrix(outputMatrix, firstMatrix->rows, firstMatrix->cols);
+    }
 
     int i,j;
     for(i = 0; i < outputMatrix->rows; ++i)
@@ -280,7 +287,11 @@ void LU_getInverseMatrix(MatrixT *inputMat, MatrixT *outInvMat)
     double x;
 
     assert(inputMat->rows == inputMat->cols);
-    allocateMatrix(outInvMat, inputMat->rows, inputMat->cols);
+    if (NULL == outInvMat->pMatrix)
+    {
+        allocateMatrix(outInvMat, inputMat->rows, inputMat->cols);
+    }
+
     int localDim = inputMat->rows - 1;
 
     allocateMatrix(&localLU, inputMat->rows, inputMat->cols);
@@ -369,4 +380,21 @@ void copyMatrix(MatrixT* srcMat, MatrixT* desMat)
     for (int i = 0; i < srcMat->rows; i++)
         for (int j = 0; j < srcMat->cols; j++)
             desMat->pMatrix[i][j] = srcMat->pMatrix[i][j];
+}
+
+double findMaxMember(MatrixT *inputMatrix)
+{
+    double max = 0.0;
+    for (int i = 0; i < inputMatrix->rows; i++)
+    {
+        for (int j = 0; j < inputMatrix->cols; j++)
+        {
+            if (inputMatrix->pMatrix[i][j] > max)
+            {
+                max = inputMatrix->pMatrix[i][j];
+            }
+        }
+    }
+
+    return max;
 }

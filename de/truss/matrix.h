@@ -41,4 +41,6 @@ void LUdecomposition(double **a, double **l, double **u, int n);
 /* Pass */
 void LU_getInverseMatrix(MatrixT *inputMat, MatrixT *outInvMat);
 
+double findMaxMember(MatrixT *inputMatrix);
+
 #endif
