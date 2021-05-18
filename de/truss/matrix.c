@@ -135,8 +135,8 @@ void multiplyMatrices(MatrixT* firstMatrix,
                       MatrixT* outputMatrix)
 {
     assert(firstMatrix->cols == secondMatrix->rows);
-    outputMatrix->rows = firstMatrix->rows;
-    outputMatrix->cols = secondMatrix->cols;
+    allocateMatrix(outputMatrix, firstMatrix->rows, secondMatrix->cols);
+    zerosMatrix(outputMatrix);
 
     for(int i = 0; i < firstMatrix->rows; ++i)
     {
@@ -156,8 +156,7 @@ void addMatrices(MatrixT* firstMatrix,
 {
     assert(firstMatrix->rows == secondMatrix->rows);
     assert(firstMatrix->cols == secondMatrix->cols);
-    outputMatrix->rows = firstMatrix->rows;
-    outputMatrix->cols = firstMatrix->cols;
+    allocateMatrix(outputMatrix, firstMatrix->rows, firstMatrix->cols);
 
     int i,j;
     for(i = 0; i < outputMatrix->rows; ++i)
@@ -171,8 +170,7 @@ void addMatrices(MatrixT* firstMatrix,
 
 void multiplyScalarMatrix(double scalar, MatrixT *matrix, MatrixT *outputMatrix)
 {
-    outputMatrix->rows = matrix->rows;
-    outputMatrix->cols = matrix->cols;
+    allocateMatrix(outputMatrix, matrix->rows, matrix->cols);
 
     for (int i = 0; i < outputMatrix->rows; i++)
         for (int j = 0; j < outputMatrix->cols; j++)
@@ -274,7 +272,6 @@ void LUdecomposition(double **a, double **l, double **u, int n)
    }
 }
 
-
 void LU_getInverseMatrix(MatrixT *inputMat, MatrixT *outInvMat)
 {
     double *d, *y;
@@ -283,6 +280,7 @@ void LU_getInverseMatrix(MatrixT *inputMat, MatrixT *outInvMat)
     double x;
 
     assert(inputMat->rows == inputMat->cols);
+    allocateMatrix(outInvMat, inputMat->rows, inputMat->cols);
     int localDim = inputMat->rows - 1;
 
     allocateMatrix(&localLU, inputMat->rows, inputMat->cols);

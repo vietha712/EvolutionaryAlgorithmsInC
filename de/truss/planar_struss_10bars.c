@@ -33,9 +33,6 @@ double Xl[NUM_OF_ELEMENTS] = {1.62,1.62,1.62,1.62,1.62,1.62,1.62,1.62,1.62,1.62}
 
 double K[TOTAL_DOF][TOTAL_DOF] = {0};
 
-double F[TOTAL_DOF] = {0};
-
-
 inline double getWeight(double A, double matDen, double len)
 {
     return (A * matDen * len);
@@ -55,11 +52,12 @@ void fix(double *X, double *A, int len)
     }
 }
 
-void getTransposeOfTe(double **A, double **B)
+void getTransposeOfTe(MatrixT* inputMat, MatrixT* outputMat)
 {
     int i, j;
-    for (i = 0; i < 4; i++)
-        for (j = 0; j < 2; j++)
+    allocateMatrix(outputMat, inputMat->cols, inputMat->rows);
+    for (i = 0; i < inputMat->cols; i++)
+        for (j = 0; j < inputMat->rows; j++)
             B[i][j] = A[j][i];
 }
 
@@ -77,38 +75,24 @@ double func(double *A)
     double le;
     int x[2], y[2];
     double l_ij, m_ij;
-    double **Te, **Te_Transpose, **invK;
-    double **ke2x2, **ke4x4;
-    double **matrix2x2_Precomputed, **output2x2, **output4x2, **output4x4; //line 57 in 10 bars
+    MatrixT Te, Te_Transpose, invK, F, productOf_invK_F;
+    MatrixT ke2x2, ke4x4;
+    MatrixT matrix2x2_Precomputed, output2x2, output4x2, output4x4; //line 57 in 10 bars
     int index[4];
     int bcDOF[4] = {9, 10, 11, 12};
     double bcValue[4] = {0};
 
-    Te = allocate(2, 4);
-    Te_Transpose = allocate(4, 2);
-    invK = allocate(TOTAL_DOF, TOTAL_DOF);
-    ke2x2 = allocate(2, 2);
-    matrix2x2_Precomputed = (double **)malloc(2 * sizeof(double *));
-    output2x2 = allocate(2, 2);
-    output4x2 = (double **)malloc(4 * sizeof(double *));
-    output4x4 = (double **)malloc(4 * sizeof(double *));
-    for (int memIndx = 0; memIndx < 2; memIndx++)
-    {
-        matrix2x2_Precomputed[memIndx] = (double *)malloc((2)*sizeof(double));
-        output2x2[memIndx] = (double *)malloc((2)*sizeof(double));
-    }
+    allocateMatrix(&Te, 2, 4);
+    allocateMatrix(&Te_Transpose, 4, 2);
+    allocateMatrix(&ke2x2, 2, 2);
+    allocateMatrix(&matrix2x2_Precomputed, 2, 2);
+    allocateMatrix(&F, TOTAL_DOF, 1); //12x1
 
-    ke4x4 = (double **)malloc(4 * sizeof(double *));
-    for (int memIndx = 0; memIndx < 4; memIndx++)
-    {
-        ke4x4[memIndx] = (double *)malloc((4)*sizeof(double));
-        output4x2[memIndx] = (double *)malloc((2)*sizeof(double));
-        output4x2[memIndx] = (double *)malloc((4)*sizeof(double));
-    }
     matrix2x2_Precomputed[0][0] = 1;
     matrix2x2_Precomputed[0][1] = -1;
     matrix2x2_Precomputed[1][0] = -1;
     matrix2x2_Precomputed[1][1] = 1;
+    zerosMatrix(&F);
     
 
     /* Calculate stiffness matrix */
@@ -130,19 +114,18 @@ double func(double *A)
         Te[2][1] = 0; Te[2][2] = 0; Te[2][3] = l_ij; Te[2][4] = m_ij;
 
         // Compute stiffness martix of element line 56
-        multiplyScalarMatrix((A[i]*E/le), matrix2x2_Precomputed, output2x2, 2, 2);
-        getTransposeOfTe(Te, Te_Transpose);
-        multiplyMatrices(Te_Transpose, TE_NUMCOLS, TE_NUMROWs,
-                         ke2x2, 2, 2, output4x2);
-        multiplyMatrices(output4x2, 4, 2,
-                         Te, 2, 4, output4x4);
+        multiplyScalarMatrix((A[i]*E/le), &matrix2x2_Precomputed, &ke2x2);
+        getTransposeOfTe(&Te, &Te_Transpose);
+        multiplyMatrices(&Te_Transpose, &ke2x2, output4x2); //line 59
+        multiplyMatrices(output4x2, Te, output4x4);
 
-        //Find index assemble
+        //Find index assemble in line 60
         index[0] = 2*element[i][0] - 1;
         index[1] = 2*element[i][0];
         index[2] = 2*element[i][1] - 1;
         index[3] = 2*element[i][1];
 
+        //line 63
         for (int row_i = 0; row_i < 4; row_i++)
         {
             for (int col_i = 0; col_i < 4; col_i++)
@@ -150,7 +133,7 @@ double func(double *A)
         }
     }
 
-    F[4] = F[8] = -P;
+    F[3][0] = F[7][0] = -P;
 
     for (int bc_i = 0; bc_i < 4; bc_i++)
     {
@@ -163,7 +146,8 @@ double func(double *A)
     }
 
     //Calculate U = K\F. inv(K)*F
-    LU_getInverseMatrix(K, invK, TOTAL_DOF);
+    LU_getInverseMatrix(&K, &invK, TOTAL_DOF);
+    multiplyMatrices(&F, &invK, &productOf_invK_F);
 
 
     /* TODO: Deallocate */

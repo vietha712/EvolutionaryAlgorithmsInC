@@ -18,10 +18,13 @@ void deallocateMatrix(MatrixT* matrix);
 
 void zerosMatrix(MatrixT* matrix);
 
+void multiplyScalarMatrix(double scalar, MatrixT *matrix, MatrixT *outputMatrix);
+
 /*Pass*/
 void multiplyMatrices(MatrixT* firstMatrix,
                       MatrixT* secondMatrix,
                       MatrixT* outputMatrix);
+
 /*Pass*/
 void addMatrices(MatrixT* firstMatrix,
                  MatrixT* secondMatrix,
