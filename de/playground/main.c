@@ -2,8 +2,6 @@
 /* Definition for user settings */
 /* Definition for a threshold of mutation scheme */
 
-#define THRESHOLD (double)0.01
-#define TOLERANCE (double)0.0001
 #define NP (int)60
 #define MAXITER (int)1500
 

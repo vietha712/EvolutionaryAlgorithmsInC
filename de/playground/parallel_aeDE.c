@@ -5,7 +5,7 @@
 #define SUB_POP_POS(current_pos,pop_size) ((current_pos - pop_size))
 
 /* Function definitions		*/
-//static void fix(double *, int);
+//void fix(double *X, int length);
 static double getCurrentToBest(double *, double *, double *, double *, double );
 static double getRand1(double *, double *, double *, double );
 static double getBest1(double *, double *, double *, double );
@@ -203,7 +203,9 @@ static void executeEvolutionOverOnePop(problemT *ctx,
             U[j] = pPop[popIndex][j];
          }
       }
-
+#ifdef TRUSS_PROBLEM
+      fix(U, varDimension); // make the value to be in discrete type
+#endif /* #if (TRUSS_PROBLEM == ENALBED) */
       U[varDimension] = ctx->penaltyFunc(&U[0]); // Evaluate trial vectors
 
       /* Comparing the trial vector 'U' and the old individual
@@ -324,7 +326,7 @@ void run_parallel_aeDE(int numOfPop,
    double **pSubPop1, **pSubNext1, *U1;
    double **pSubPop3, **pSubNext3, *U3; 
    double CR = 0.0, F = 0.5, minValue = DBL_MAX;
-   clock_t startTime, endTime;
+   double startTime, endTime;
 
    if (s) INITRAND;
 
@@ -335,7 +337,7 @@ void run_parallel_aeDE(int numOfPop,
    printf("Dimension of the problem: %d\n", varDimension);
 
    /* Starting timer    */
-   startTime = clock();
+   startTime = omp_get_wtime();
 
    /* Allocating memory for current and next population, intializing
       current population with uniformly distributed random values and
@@ -378,6 +380,9 @@ void run_parallel_aeDE(int numOfPop,
                      (problemCtx->upperConstraints[j] - problemCtx->lowerConstraints[j])*URAND;
 
       /* Evaluate the fitness for each individual */
+#ifdef TRUSS_PROBLEM
+      fix(pPop[popIndex], varDimension);
+#endif
       pPop[popIndex][varDimension] = problemCtx->penaltyFunc(pPop[popIndex]);
    } /* for (popIndex = 0; popIndex < numOfPop; popIndex++) */
 
@@ -471,16 +476,19 @@ void run_parallel_aeDE(int numOfPop,
       }
 
       applyEliteStrategy(pPop, pSubPop1, pSubPop2, pSubPop3, varDimension, numOfPop);
-
+      
+#ifndef TRUSS_PROBLEM
       if(1 == isSatisfiedRastrigin(pPop, numOfPop, varDimension))
          break;
+#endif
    } /* Main loop */
 
    /* Calculating and output results */
 
    /* Stopping timer	*/
-   endTime = clock();
-   result->executionTime = (double)(endTime - startTime)/(double)CLOCKS_PER_SEC;
+   endTime = omp_get_wtime();
+   result->executionTime = (endTime - startTime);
+
 
    /* Finding best individual	*/
    for (minValue = DBL_MAX, popIndex = 0; popIndex < numOfPop; popIndex++)

@@ -38,11 +38,10 @@ typedef struct problemTag
 
 typedef struct resultTag
 {
+    double executionTime;
     double optimizedVars[MAX_DIMENSION];
     int iteration;
     double fitnessVal;
-    double pad[9];
-    double executionTime;
 }resultT;
 
 typedef enum mutationSchemeTag
