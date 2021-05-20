@@ -135,7 +135,7 @@ void multiplyMatrices(MatrixT* firstMatrix,
                       MatrixT* outputMatrix)
 {
     assert(firstMatrix->cols == secondMatrix->rows);
-    if (NULL == outInvMat->pMatrix)
+    if (NULL == outputMatrix->pMatrix)
     {
         allocateMatrix(outputMatrix, firstMatrix->rows, secondMatrix->cols);
     }

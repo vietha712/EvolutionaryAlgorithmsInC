@@ -1,8 +1,12 @@
 # Utilities
-PROJ := aeDE
+PROJ := test_main
 
 # Problem
-PROBLEM := rastrigin_20d
+PROBLEM := planar_truss_10bars
+
+#LIB
+LIB := matrix
+
 #Paths
 OUTPUT_PATH := _build
 INC_PATH :=
@@ -20,7 +24,7 @@ CC_OPT := -Wall -pedantic -O3 -funroll-loops
 vpath %.c $(SRC_PATH)
 
 #OBJECT FILES
-OBJ_FILES := $(OUTPUT_PATH)/$(PROBLEM).o
+OBJ_FILES := $(OUTPUT_PATH)/$(PROBLEM).o $(OUTPUT_PATH)/$(LIB).o
 
 # Commands
 
@@ -30,6 +34,9 @@ OBJ_FILES := $(OUTPUT_PATH)/$(PROBLEM).o
 build: $(PROJ).c $(OBJ_FILES) 
 	@echo "Compiling $(PROJ).c"
 	@$(CC) $(CC_OPT) $(OBJ_FILES) $(PROJ).c -o $(OUTPUT_PATH)/$(PROJ).exe -lm
+
+$(OUTPUT_PATH)/$(LIB).o: $(LIB).c
+	@$(CC) -c $(CC_OPT) $< -o $(OUTPUT_PATH)/$(LIB).o
 
 $(OUTPUT_PATH)/$(PROBLEM).o: $(PROBLEM).c build-dir
 	@$(CC) -c $(CC_OPT) $< -o $(OUTPUT_PATH)/$(PROBLEM).o
