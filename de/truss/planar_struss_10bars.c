@@ -10,13 +10,15 @@
 #define TOTAL_DOF 12 // DOF * NUM_OF_NODES
 #define TE_NUMCOLS 4
 #define TE_NUMROWs 2
+const double rho = 0.1; // density of material lb/in^3
+const int length = 360; //in
 
 void getTransposeOfTe(MatrixT* inputMat, MatrixT* outputMat);
 
 const double standard_A[42] = {1.62, 1.80, 1.99, 2.13, 2.38, 2.62, 2.63, 2.88, 2.93, 3.09, 3.13, 3.38,
                       3.47, 3.55, 3.63, 3.84, 3.87, 3.88, 4.18, 4.22, 4.49, 4.59, 4.80, 4.97,
                       5.12, 5.74, 7.22, 7.97, 11.50, 13.50, 13.90, 14.20, 15.50, 16.00, 16.90,
-                      18.80, 19.90, 22.00, 22.90, 26.50, 30.00, 33.50}; //Standard cross-sectional areas for design variable
+                      18.80, 19.90, 22.00, 22.90, 26.50, 30.00, 33.50}; //Standard cross-sectional areas for design variable in^2
 
 //const double preCpted_A[10] = {30, 1.62, 22.9, 13.5, 1.62, 1.62, 7.97, 26.5, 22, 1.8};
 
@@ -36,22 +38,36 @@ int gCoord[2][6] = {{720, 720, 360, 360, 0, 0},
 double Xl[NUM_OF_ELEMENTS] = {1.62,1.62,1.62,1.62,1.62,1.62,1.62,1.62,1.62,1.62},
        Xu[NUM_OF_ELEMENTS] = {33.50,33.50,33.50,33.50,33.50,33.50,33.50,33.50,33.50,33.50};
 
-inline double getWeight(double A, double matDen, double len)
+inline double getWeight(double A)
 {
-    return (A * matDen * len);
+    return (A * rho * length);
 }
 
 void fix(double *X, int length)
 {
     double temp1, temp2;
-
     for (int i = 0; i < length; i++)
     {
         for (int j = 0; j < 42; j++)
         {
-            if ((X[i] == standard_A[j]) || ((j == 41) && (X[i] > standard_A[j])))
+            if (X[i] > standard_A[j])
+            {
+                continue;
+            }
+            X[i] = standard_A[j];
+            break;
+        }
+    }
+
+#if 0
+    for (int i = 0; i < length; i++)
+    {
+        for (int j = 0; j < 42; j++)
+        {
+            if ((X[i] == standard_A[j]))
             {
                 X[i] = standard_A[j];
+                break;
             }
             else
             {
@@ -60,14 +76,17 @@ void fix(double *X, int length)
                    temp1 = fabs(X[i] - standard_A[j - 1]);
                    temp2 = fabs(X[i] - standard_A[j]);
                    X[i] = ((temp1 < temp2) ? standard_A[j-1] : standard_A[j]);
+                   break;
                }
                else
                {
                    X[i] = standard_A[j];
+                   break;
                }
             }
         }
     }
+#endif
 }
 
 void getTransposeOfTe(MatrixT* inputMat, MatrixT* outputMat)
@@ -79,19 +98,28 @@ void getTransposeOfTe(MatrixT* inputMat, MatrixT* outputMat)
             outputMat->pMatrix[i][j] = inputMat->pMatrix[j][i];
 }
 
+double findMaxMemInArray(double *array, int length)
+{
+    double max = 0;
+    for (int i = 0; i < length; i++)
+    {
+        max = (array[i] > max) ? array[i] : max;
+    }
+    return max;
+}
+
 const double epsilon_1 = 1.0;
 double epsilon_2 = 20.0;
 int E = 10000000;
 int P = 100000;
-double rho = 2770; // density of material kg/m^3
-int D = 10;
+const int D = 10;
 const double minDisp = -2.0, maxDisp = 2.0;
 const double minStress = -25, maxStress = 25;
 
 double func(double *A)
 {
-    extern int D;
-    double sum;
+    extern const int D;
+    double sum = 0.0;
     double le;
     int x[2], y[2];
     double l_ij, m_ij;
@@ -243,20 +271,27 @@ double func(double *A)
             maxAbsStress = stress_e[i];
         }
     }
-    double Csig = (maxAbsStress/LimitSig) - 1;
-#if 0
-    double weight = 0;
+    double Csig = (maxAbsStress/LimitSig) - 1; //Pass
 
+    /*********************** Check constraints violation ******************************/
+    double weight = 0;
+    double v = 0.0; // sum of design violated variables
+    double dispViolateVar[10] = {0, 0, 0, 0 ,0 ,0 ,0, 0, 0, 0};
+    double stressViolateVar[10] = {0, 0, 0, 0 ,0 ,0 ,0, 0, 0, 0};
+    int numOfConstraints = 2;
+    int isViolated = 0;
+#if 0
     //Displacement constraints
     for (int i = 0; i < NUM_OF_ELEMENTS; i++)
     {
         if ((minDisp <= U.pMatrix[i][0]) && (U.pMatrix[i][0] <= maxDisp))
         {
-
+            continue;
         }
         else
         {
-
+            dispViolateVar[i] = A[i];
+            isViolated = 1;
         }
     }
 
@@ -265,15 +300,31 @@ double func(double *A)
     {
         if ((minStress <= stress_e[i]) && (stress_e[i] <= maxStress))
         {
-            
+            continue;
         }
         else
         {
 
+            isViolated = 1;
+            stressViolateVar[i] = A[i];
         }
     }
+
+    if (1 == isViolated)
+    {
+        v += findMaxMemInArray(dispViolateVar, D);
+        v += findMaxMemInArray(stressViolateVar, D);
+    }
+
+
 #endif
     //TODO: calculate total weight
+    for (int i = 0; i < D; i++)
+    {
+        sum += getWeight(A[i]);
+    }
+
+    
 
     /* Deallocate */
     deallocateMatrix(&temp);
@@ -292,5 +343,5 @@ double func(double *A)
     deallocateMatrix(&output4x2);
     deallocateMatrix(&output4x4);
 
-    return 0.0;
+    return pow((1 + epsilon_1*v), epsilon_2)*sum;
 }

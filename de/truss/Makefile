@@ -42,7 +42,7 @@ $(OUTPUT_PATH)/$(PROBLEM).o: $(PROBLEM).c build-dir
 	@$(CC) -c $(CC_OPT) $< -o $(OUTPUT_PATH)/$(PROBLEM).o
 
 build_test:
-	gcc -Wall -pedantic -O -o test_main.exe test_main.c planar_struss_10bars.c matrix.c -lm
+	gcc -Wall -g -pedantic -O -o test_main.exe test_main.c planar_struss_10bars.c matrix.c -lm
 
 build-dir:
 	@mkdir -p $(OUTPUT_PATH)
