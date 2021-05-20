@@ -135,7 +135,7 @@ void multiplyMatrices(MatrixT* firstMatrix,
                       MatrixT* outputMatrix)
 {
     assert(firstMatrix->cols == secondMatrix->rows);
-    if (NULL == outputMatrix->pMatrix)
+    if (0 == outputMatrix->isInit)
     {
         allocateMatrix(outputMatrix, firstMatrix->rows, secondMatrix->cols);
     }
@@ -160,7 +160,7 @@ void addMatrices(MatrixT* firstMatrix,
 {
     assert(firstMatrix->rows == secondMatrix->rows);
     assert(firstMatrix->cols == secondMatrix->cols);
-    if (NULL == outputMatrix->pMatrix)
+    if (0 == outputMatrix->isInit)
     {
         allocateMatrix(outputMatrix, firstMatrix->rows, firstMatrix->cols);
     }
@@ -226,7 +226,8 @@ void printMatrix(MatrixT* matrix)
     for(i = 0; i < matrix->rows; ++i)
     {
         for(j = 0; j < matrix->cols; ++j)
-            printf("matrix[%d][%d] = %.15f\n", i, j, matrix->pMatrix[i][j]);
+            printf("%.12f ", matrix->pMatrix[i][j]);
+        printf("\n");
     }
 }
 
@@ -287,7 +288,7 @@ void LU_getInverseMatrix(MatrixT *inputMat, MatrixT *outInvMat)
     double x;
 
     assert(inputMat->rows == inputMat->cols);
-    if (NULL == outInvMat->pMatrix)
+    if (0 == outInvMat->isInit)
     {
         allocateMatrix(outInvMat, inputMat->rows, inputMat->cols);
     }
@@ -359,6 +360,15 @@ void allocateMatrix(MatrixT* matrix, int rows, int cols)
     matrix->pMatrix = (double **)malloc(matrix->rows * sizeof(double *));
     for (int i = 0; i < matrix->rows; i++)
         matrix->pMatrix[i] = (double *)malloc(matrix->cols*sizeof(double));
+
+    matrix->isInit = 1;
+}
+
+void initMatrix(MatrixT* matrix)
+{
+    matrix->rows = 0.0;
+    matrix->cols = 0.0;
+    matrix->isInit = 0;
 }
 
 void deallocateMatrix(MatrixT* matrix)
@@ -366,6 +376,9 @@ void deallocateMatrix(MatrixT* matrix)
     for (int i = 0; i < matrix->rows; i++)
         free(matrix->pMatrix[i]);
     free(matrix->pMatrix);
+    matrix->isInit = 0;
+    matrix->rows = 0.0;
+    matrix->cols = 0.0;
 }
 
 void zerosMatrix(MatrixT* matrix)

@@ -79,11 +79,13 @@ double epsilon_2 = 20.0;
 int E = 10000000;
 int P = 100000;
 double rho = 2770; // density of material kg/m^3
-//int D = 10;
+int D = 10;
+const double minDisp = -2.0, maxDisp = 2.0;
+const double minStress = -25, maxStress = 25;
 
 double func(double *A)
 {
-    //extern int D;
+    extern int D;
     double sum;
     double le;
     int x[2], y[2];
@@ -103,6 +105,16 @@ double func(double *A)
     allocateMatrix(&Be, 1, 2);
     allocateMatrix(&disp_e, 4, 1);
     allocateMatrix(&K, TOTAL_DOF, TOTAL_DOF);
+    initMatrix(&invK);
+    initMatrix(&F);
+    initMatrix(&ke4x4);
+    initMatrix(&U);
+    initMatrix(&de_o);
+    initMatrix(&productOfBe_de);
+    initMatrix(&output2x2);
+    initMatrix(&output4x2);
+    initMatrix(&output4x4);
+
 
     matrix2x2_Precomputed.pMatrix[0][0] = 1;
     matrix2x2_Precomputed.pMatrix[0][1] = -1;
@@ -111,7 +123,6 @@ double func(double *A)
     zerosMatrix(&F);
     zerosMatrix(&K);
     
-
     /* Calculate stiffness matrix */
     for (int i = 0; i < NUM_OF_ELEMENTS; i++)
     {
@@ -135,12 +146,17 @@ double func(double *A)
         getTransposeOfTe(&Te, &Te_Transpose);
         multiplyMatrices(&Te_Transpose, &ke2x2, &output4x2); //line 59
         multiplyMatrices(&output4x2, &Te, &output4x4);
+        printMatrix(&output4x4);
 
         //Find index assemble in line 60
-        index[0] = 2*element[i][0] - 1;
-        index[1] = 2*element[i][0];
-        index[2] = 2*element[i][1] - 1;
-        index[3] = 2*element[i][1];
+        index[0] = 2*element[i][0] - 1 - 1;
+        index[1] = 2*element[i][0] - 1;
+        index[2] = 2*element[i][1] - 1 - 1;
+        index[3] = 2*element[i][1] - 1;
+        printf("1 %d\n", index[0]);
+        printf("2 %d\n", index[1]);
+        printf("3 %d\n", index[2]);
+        printf("4 %d\n", index[3]);
 
         //line 63
         for (int row_i = 0; row_i < 4; row_i++)
@@ -148,7 +164,10 @@ double func(double *A)
             for (int col_i = 0; col_i < 4; col_i++)
                 K.pMatrix[index[row_i]][index[col_i]] =  K.pMatrix[index[row_i]][index[col_i]] + output4x4.pMatrix[row_i][col_i];
         }
+        printMatrix(&K); //DEBUG K
+
     }
+        return 0.0;
 
     F.pMatrix[3][0] = F.pMatrix[7][0] = -P;
 
@@ -239,19 +258,14 @@ double func(double *A)
     for (int i = 0; i < NUM_OF_ELEMENTS; i++)
         printf("stress_e[%d] = %f, ", i, stress_e[i]);
     printf("\n");
-
     printMatrix(&U);
-
-    //TODO: check constraints. U and stress_e
 #if 0
     double weight = 0;
-    double minDisp, maxDisp;
-    double minStress, maxStress;
 
     //Displacement constraints
     for (int i = 0; i < NUM_OF_ELEMENTS; i++)
     {
-        if ((minDisp <= U[i]) && (U[i] <= maxDisp))
+        if ((minDisp <= U.pMatrix[i][0]) && (U.pMatrix[i][0] <= maxDisp))
         {
 
         }

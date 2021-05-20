@@ -9,8 +9,11 @@ typedef struct MatrixTag
 {
     int rows;
     int cols;
+    int isInit;
     double** pMatrix;
 } MatrixT;
+
+void initMatrix(MatrixT* matrix);
 
 void allocateMatrix(MatrixT* matrix, int rows, int cols);
 
