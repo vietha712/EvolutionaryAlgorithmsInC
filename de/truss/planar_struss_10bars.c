@@ -20,8 +20,13 @@ const double standard_A[42] = {1.62, 1.80, 1.99, 2.13, 2.38, 2.62, 2.63, 2.88, 2
 
 //const double preCpted_A[10] = {30, 1.62, 22.9, 13.5, 1.62, 1.62, 7.97, 26.5, 22, 1.8};
 
+/*
+{ {3, 5}, {1, 3}, {4, 6}, {2, 4}, {3, 4}, 
+                                    {1, 2}, {4, 5}, {3, 6}, {2, 3}, {1, 4} };*/
+//Reindex                                 
 int element[NUM_OF_ELEMENTS][2] = { {3, 5}, {1, 3}, {4, 6}, {2, 4}, {3, 4}, 
                                     {1, 2}, {4, 5}, {3, 6}, {2, 3}, {1, 4} };
+
 
 double stress_e[NUM_OF_ELEMENTS] = {0};
 
@@ -92,9 +97,9 @@ double func(double *A)
     double l_ij, m_ij;
     MatrixT Te, Te_Transpose, invK, F, K;
     MatrixT ke2x2, ke4x4, Be, U, disp_e, de_o, productOfBe_de;
-    MatrixT matrix2x2_Precomputed, output2x2, output4x2, output4x4; //line 57 in 10 bars
+    MatrixT matrix2x2_Precomputed, output4x2, output4x4; //line 57 in 10 bars
     int index[4];
-    int bcDOF[4] = {9, 10, 11, 12};
+    int bcDOF[4] = {8, 9, 10, 11}; //reindex in C. Original 9 - 10 - 11 - 12
     double bcValue[4] = {0};
 
     allocateMatrix(&Te, 2, 4);
@@ -106,12 +111,10 @@ double func(double *A)
     allocateMatrix(&disp_e, 4, 1);
     allocateMatrix(&K, TOTAL_DOF, TOTAL_DOF);
     initMatrix(&invK);
-    initMatrix(&F);
     initMatrix(&ke4x4);
     initMatrix(&U);
     initMatrix(&de_o);
     initMatrix(&productOfBe_de);
-    initMatrix(&output2x2);
     initMatrix(&output4x2);
     initMatrix(&output4x4);
 
@@ -126,10 +129,10 @@ double func(double *A)
     /* Calculate stiffness matrix */
     for (int i = 0; i < NUM_OF_ELEMENTS; i++)
     {
-        x[0] = gCoord[0][element[i][0]];
-        x[1] = gCoord[0][element[i][1]];
-        y[0] = gCoord[1][element[i][0]];
-        y[1] = gCoord[1][element[i][1]];
+        x[0] = gCoord[0][element[i][0] - 1];
+        x[1] = gCoord[0][element[i][1] - 1];
+        y[0] = gCoord[1][element[i][0] - 1];
+        y[1] = gCoord[1][element[i][1] - 1];
 
         le = sqrt( pow((x[1] - x[0]), 2) + pow((y[1] - y[0]), 2) ); //
 
@@ -146,17 +149,12 @@ double func(double *A)
         getTransposeOfTe(&Te, &Te_Transpose);
         multiplyMatrices(&Te_Transpose, &ke2x2, &output4x2); //line 59
         multiplyMatrices(&output4x2, &Te, &output4x4);
-        printMatrix(&output4x4);
 
         //Find index assemble in line 60
         index[0] = 2*element[i][0] - 1 - 1;
         index[1] = 2*element[i][0] - 1;
         index[2] = 2*element[i][1] - 1 - 1;
         index[3] = 2*element[i][1] - 1;
-        printf("1 %d\n", index[0]);
-        printf("2 %d\n", index[1]);
-        printf("3 %d\n", index[2]);
-        printf("4 %d\n", index[3]);
 
         //line 63
         for (int row_i = 0; row_i < 4; row_i++)
@@ -164,10 +162,7 @@ double func(double *A)
             for (int col_i = 0; col_i < 4; col_i++)
                 K.pMatrix[index[row_i]][index[col_i]] =  K.pMatrix[index[row_i]][index[col_i]] + output4x4.pMatrix[row_i][col_i];
         }
-        printMatrix(&K); //DEBUG K
-
-    }
-        return 0.0;
+    } //Pass K
 
     F.pMatrix[3][0] = F.pMatrix[7][0] = -P;
 
@@ -179,11 +174,11 @@ double func(double *A)
 
         K.pMatrix[temp][temp] = 1;
         F.pMatrix[temp][0] = bcValue[bc_i];
-    }
+    } //Pass K
 
     //Calculate U = K\F. inv(K)*F
     LU_getInverseMatrix(&K, &invK);
-    multiplyMatrices(&F, &invK, &U); //U is nodal displacement of each element
+    multiplyMatrices(&invK, &F, &U); //U is nodal displacement of each element //Pass U
 
     //Get absolute value for U
     MatrixT U_Abs;
@@ -191,7 +186,7 @@ double func(double *A)
     for (int abs_i = 0; abs_i < U.rows; abs_i++)
         for (int abs_j = 0; abs_j < U.cols; abs_j++)
             U_Abs.pMatrix[abs_i][abs_j] = fabs(U.pMatrix[abs_i][abs_j]);
-        
+
     double Cdisp = findMaxMember(&U_Abs) - 2.0; // max value of nodal displacement
     deallocateMatrix(&U_Abs);
 
@@ -199,10 +194,10 @@ double func(double *A)
     /* Compute stress for each element */
     for (int i = 0; i < NUM_OF_ELEMENTS; i++)
     {
-        x[0] = gCoord[0][element[i][0]];
-        x[1] = gCoord[0][element[i][1]];
-        y[0] = gCoord[1][element[i][0]];
-        y[1] = gCoord[1][element[i][1]];
+        x[0] = gCoord[0][element[i][0] - 1];
+        x[1] = gCoord[0][element[i][1] - 1];
+        y[0] = gCoord[1][element[i][0] - 1];
+        y[1] = gCoord[1][element[i][1] - 1];
 
         le = sqrt( pow((x[1] - x[0]), 2) + pow((y[1] - y[0]), 2) ); //
 
@@ -219,10 +214,10 @@ double func(double *A)
         Be.pMatrix[0][1] = 1/le;
         
         //Compute displacement of each bar
-        index[0] = 2*element[i][0] - 1;
-        index[1] = 2*element[i][0];
-        index[2] = 2*element[i][1] - 1;
-        index[3] = 2*element[i][1];
+        index[0] = 2*element[i][0] - 1 - 1;
+        index[1] = 2*element[i][0] - 1;
+        index[2] = 2*element[i][1] - 1 - 1;
+        index[3] = 2*element[i][1] - 1;
         disp_e.pMatrix[0][0] = U.pMatrix[index[0]][0];
         disp_e.pMatrix[1][0] = U.pMatrix[index[1]][0];
         disp_e.pMatrix[2][0] = U.pMatrix[index[2]][0];
@@ -237,28 +232,18 @@ double func(double *A)
     }
 
     double LimitSig = 25000;
-    double maxStress = 0.0;
+    double maxAbsStress = 0.0;
     for (int i = 0; i < NUM_OF_ELEMENTS; i++)
         stress_e[i] = fabs(stress_e[i]);
 
     for (int i = 0; i < NUM_OF_ELEMENTS; i++)
     {
-        if(stress_e[i] > maxStress)
+        if(stress_e[i] > maxAbsStress)
         {
-            maxStress = stress_e[i];
+            maxAbsStress = stress_e[i];
         }
     }
-
-    double Csig = maxStress/(LimitSig - 1);
-
-    //Test
-    printf("-----------------------");
-    printf("Csig: %f, Cdisp: %f \n", Csig, Cdisp);
-    printf("Stress\n");
-    for (int i = 0; i < NUM_OF_ELEMENTS; i++)
-        printf("stress_e[%d] = %f, ", i, stress_e[i]);
-    printf("\n");
-    printMatrix(&U);
+    double Csig = (maxAbsStress/LimitSig) - 1;
 #if 0
     double weight = 0;
 
@@ -304,7 +289,6 @@ double func(double *A)
     deallocateMatrix(&de_o);
     deallocateMatrix(&productOfBe_de);
     deallocateMatrix(&matrix2x2_Precomputed);
-    deallocateMatrix(&output2x2);
     deallocateMatrix(&output4x2);
     deallocateMatrix(&output4x4);
 
