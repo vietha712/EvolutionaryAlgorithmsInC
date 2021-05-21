@@ -46,47 +46,24 @@ inline double getWeight(double A)
 void fix(double *X, int length)
 {
     double temp1, temp2;
+
     for (int i = 0; i < length; i++)
     {
         for (int j = 0; j < 42; j++)
         {
-            if (X[i] > standard_A[j])
+            if ((X[i] > standard_A[j]))
             {
                 continue;
             }
-            X[i] = standard_A[j];
-            break;
-        }
-    }
-
-#if 0
-    for (int i = 0; i < length; i++)
-    {
-        for (int j = 0; j < 42; j++)
-        {
-            if ((X[i] == standard_A[j]))
-            {
-                X[i] = standard_A[j];
-                break;
-            }
             else
             {
-               if (j != 0)
-               {
-                   temp1 = fabs(X[i] - standard_A[j - 1]);
-                   temp2 = fabs(X[i] - standard_A[j]);
-                   X[i] = ((temp1 < temp2) ? standard_A[j-1] : standard_A[j]);
-                   break;
-               }
-               else
-               {
-                   X[i] = standard_A[j];
-                   break;
-               }
+                temp1 = X[i] - standard_A[j];
+                temp2 = X[i] - standard_A[j - 1];
+                X[i] = (fabs(temp1) <= fabs(temp2)) ? standard_A[j] : standard_A[j - 1];
+                break;
             }
         }
     }
-#endif
 }
 
 void getTransposeOfTe(MatrixT* inputMat, MatrixT* outputMat)
@@ -123,8 +100,8 @@ double func(double *A)
     double le;
     int x[2], y[2];
     double l_ij, m_ij;
-    MatrixT Te, Te_Transpose, invK, F, K;
-    MatrixT ke2x2, ke4x4, Be, U, disp_e, de_o, productOfBe_de;
+    MatrixT Te, Te_Transpose, invK, F, K, temp;
+    MatrixT ke2x2, Be, U, disp_e, de_o, productOfBe_de;
     MatrixT matrix2x2_Precomputed, output4x2, output4x4; //line 57 in 10 bars
     int index[4];
     int bcDOF[4] = {8, 9, 10, 11}; //reindex in C. Original 9 - 10 - 11 - 12
@@ -139,7 +116,6 @@ double func(double *A)
     allocateMatrix(&disp_e, 4, 1);
     allocateMatrix(&K, TOTAL_DOF, TOTAL_DOF);
     initMatrix(&invK);
-    initMatrix(&ke4x4);
     initMatrix(&U);
     initMatrix(&de_o);
     initMatrix(&productOfBe_de);
@@ -218,7 +194,6 @@ double func(double *A)
     double Cdisp = findMaxMember(&U_Abs) - 2.0; // max value of nodal displacement
     deallocateMatrix(&U_Abs);
 
-    MatrixT temp;
     /* Compute stress for each element */
     for (int i = 0; i < NUM_OF_ELEMENTS; i++)
     {
@@ -274,12 +249,12 @@ double func(double *A)
     double Csig = (maxAbsStress/LimitSig) - 1; //Pass
 
     /*********************** Check constraints violation ******************************/
-    double weight = 0;
+    //double weight = 0;
     double v = 0.0; // sum of design violated variables
-    double dispViolateVar[10] = {0, 0, 0, 0 ,0 ,0 ,0, 0, 0, 0};
-    double stressViolateVar[10] = {0, 0, 0, 0 ,0 ,0 ,0, 0, 0, 0};
-    int numOfConstraints = 2;
-    int isViolated = 0;
+    //double dispViolateVar[10] = {0, 0, 0, 0 ,0 ,0 ,0, 0, 0, 0};
+    //double stressViolateVar[10] = {0, 0, 0, 0 ,0 ,0 ,0, 0, 0, 0};
+    //int numOfConstraints = 2;
+    //int isViolated = 0;
 #if 0
     //Displacement constraints
     for (int i = 0; i < NUM_OF_ELEMENTS; i++)
@@ -324,8 +299,6 @@ double func(double *A)
         sum += getWeight(A[i]);
     }
 
-    
-
     /* Deallocate */
     deallocateMatrix(&temp);
     deallocateMatrix(&Te);
@@ -333,7 +306,6 @@ double func(double *A)
     deallocateMatrix(&invK);
     deallocateMatrix(&F);
     deallocateMatrix(&ke2x2);
-    deallocateMatrix(&ke4x4);
     deallocateMatrix(&Be);
     deallocateMatrix(&U);
     deallocateMatrix(&disp_e);
@@ -343,5 +315,5 @@ double func(double *A)
     deallocateMatrix(&output4x2);
     deallocateMatrix(&output4x4);
 
-    return pow((1 + epsilon_1*v), epsilon_2)*sum;
+    return sum;
 }

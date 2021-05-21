@@ -185,8 +185,10 @@ int main(int argc, char **argv)
 
       for (j = 0; j < D; j++)
          pPop[i][j] = Xl[j] + (Xu[j] - Xl[j])*URAND;
-      //fix(pPop[i], 10);
-      pPop[i][D] = func(pPop[i]);
+
+      fix(pPop[i], D);
+
+      pPop[i][D] = func((double *)(pPop[i]));
       numOfFuncEvals++;
 
       pNext[i] = (double *)malloc((D+1)*sizeof(double));
@@ -233,7 +235,8 @@ int main(int argc, char **argv)
             else
                U[j] = pPop[i][j];
          }
-         //fix(pPop[i], 10);
+
+         fix(pPop[i], D);
          U[D] = func(U);
          numOfFuncEvals++;
 

@@ -44,6 +44,9 @@ $(OUTPUT_PATH)/$(PROBLEM).o: $(PROBLEM).c build-dir
 build_test:
 	gcc -Wall -g -pedantic -O -o test_main.exe test_main.c planar_struss_10bars.c matrix.c -lm
 
+build_de:
+	gcc -Wall -pedantic -O -o de de.c planar_struss_10bars.c matrix.c -lm
+
 build-dir:
 	@mkdir -p $(OUTPUT_PATH)
 
