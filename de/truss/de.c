@@ -63,6 +63,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <float.h>
+#include <math.h>
 
 /* Function definitions		*/
 
@@ -99,9 +100,9 @@ int main(int argc, char **argv)
    register int i, j, k, r1, r2, r3, jrand, numOfFuncEvals = 0;
    extern int D;
    extern double Xl[], Xu[];
-   int NP = 20*D, Gmax = 1000, c, index = -1, s = 1;
+   int NP = 25, Gmax = 10000, c, index = -1, s = 1;
    double **pPop, **pNext, **ptr, *iptr, *U;
-   double CR = 0.9, F = 0.9, minValue = DBL_MAX, totaltime = 0.0;
+   double CR = 0.8, F = 1, minValue = DBL_MAX, totaltime = 0.0;
    char *ofile = NULL;
    FILE *fid;
    clock_t startTime, endTime;
@@ -236,7 +237,7 @@ int main(int argc, char **argv)
                U[j] = pPop[i][j];
          }
 
-         fix(pPop[i], D);
+         fix(U, D);
          U[D] = func(U);
          numOfFuncEvals++;
 
@@ -294,7 +295,6 @@ int main(int argc, char **argv)
    }
 
    /* Finding best individual	*/
-
    for (i=0; i < NP; i++)
    {
       if (pPop[i][D] < minValue)
@@ -308,13 +308,13 @@ int main(int argc, char **argv)
 
    printf("Execution time: %.3f s\n", totaltime / (double)CLOCKS_PER_SEC);
    printf("Number of objective function evaluations: %d\n", numOfFuncEvals);
-
    printf("Solution:\nValues of variables: ");
    for (i=0; i < D; i++)
-      printf("%.15f ", pPop[index][i]);
+      printf("%.2f ", pPop[index][i]);
+
 
    printf("\nObjective function value: ");
-   printf("%.15f\n", pPop[index][D]);
+   printf("%.3f\n", pPop[index][D]);
 
 
    /* Freeing dynamically allocated memory	*/

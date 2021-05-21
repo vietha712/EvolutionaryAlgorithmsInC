@@ -47,6 +47,15 @@ void fix(double *X, int length)
 {
     double temp1, temp2;
 
+    for (int i=0; i<length; i++)
+    {
+        while (X[i] < Xl[i] || X[i] > Xu[i])
+        {
+            if (X[i] < Xl[i]) X[i] = 2.0*Xl[i] - X[i];
+            if (X[i] > Xu[i]) X[i] = 2.0*Xu[i] - X[i];
+        }
+    }
+
     for (int i = 0; i < length; i++)
     {
         for (int j = 0; j < 42; j++)
@@ -91,7 +100,7 @@ int E = 10000000;
 int P = 100000;
 const int D = 10;
 const double minDisp = -2.0, maxDisp = 2.0;
-const double minStress = -25, maxStress = 25;
+const double minStress = -25000, maxStress = 25000;
 
 double func(double *A)
 {
@@ -183,8 +192,9 @@ double func(double *A)
     //Calculate U = K\F. inv(K)*F
     LU_getInverseMatrix(&K, &invK);
     multiplyMatrices(&invK, &F, &U); //U is nodal displacement of each element //Pass U
-
+    
     //Get absolute value for U
+#if 0
     MatrixT U_Abs;
     allocateMatrix(&U_Abs, U.rows, U.cols);
     for (int abs_i = 0; abs_i < U.rows; abs_i++)
@@ -193,7 +203,7 @@ double func(double *A)
 
     double Cdisp = findMaxMember(&U_Abs) - 2.0; // max value of nodal displacement
     deallocateMatrix(&U_Abs);
-
+#endif
     /* Compute stress for each element */
     for (int i = 0; i < NUM_OF_ELEMENTS; i++)
     {
@@ -234,6 +244,7 @@ double func(double *A)
         stress_e[i] = temp.pMatrix[0][0];
     }
 
+#if 0
     double LimitSig = 25000;
     double maxAbsStress = 0.0;
     for (int i = 0; i < NUM_OF_ELEMENTS; i++)
@@ -247,27 +258,26 @@ double func(double *A)
         }
     }
     double Csig = (maxAbsStress/LimitSig) - 1; //Pass
+#endif
 
     /*********************** Check constraints violation ******************************/
-    //double weight = 0;
-    double v = 0.0; // sum of design violated variables
-    //double dispViolateVar[10] = {0, 0, 0, 0 ,0 ,0 ,0, 0, 0, 0};
-    //double stressViolateVar[10] = {0, 0, 0, 0 ,0 ,0 ,0, 0, 0, 0};
-    //int numOfConstraints = 2;
-    //int isViolated = 0;
-#if 0
+#if 1
+    double Cdisp[10], Cstress[10];
+    double sumOfCdisp = 0, sumOfCtress = 0;
+
     //Displacement constraints
     for (int i = 0; i < NUM_OF_ELEMENTS; i++)
     {
         if ((minDisp <= U.pMatrix[i][0]) && (U.pMatrix[i][0] <= maxDisp))
         {
-            continue;
+            Cdisp[i] = 0;
         }
         else
         {
-            dispViolateVar[i] = A[i];
-            isViolated = 1;
+            Cdisp[i] = fabs(((U.pMatrix[i][0] - maxDisp)/maxDisp));
+            //Cdisp[i] = U.pMatrix[i][0]; //aeDE paper
         }
+        sumOfCdisp += Cdisp[i];
     }
 
     //Stress constraints
@@ -275,30 +285,25 @@ double func(double *A)
     {
         if ((minStress <= stress_e[i]) && (stress_e[i] <= maxStress))
         {
-            continue;
+            Cstress[i] = 0;
         }
         else
         {
-
-            isViolated = 1;
-            stressViolateVar[i] = A[i];
+            Cstress[i] = fabs((stress_e[i] - maxStress)/maxStress);
+            //Cstress[i] = stress_e[i];//aeDE paper
         }
+        sumOfCtress += Cstress[i];
     }
-
-    if (1 == isViolated)
-    {
-        v += findMaxMemInArray(dispViolateVar, D);
-        v += findMaxMemInArray(stressViolateVar, D);
-    }
-
-
 #endif
-    //TODO: calculate total weight
+    // calculate total weight
     for (int i = 0; i < D; i++)
     {
         sum += getWeight(A[i]);
     }
-
+#if 0 //MATLAB
+    sumOfCdisp = findMaxMemInArray(Cdisp, 10);
+    sumOfCtress = findMaxMemInArray(Cstress, 10);
+#endif
     /* Deallocate */
     deallocateMatrix(&temp);
     deallocateMatrix(&Te);
@@ -315,5 +320,5 @@ double func(double *A)
     deallocateMatrix(&output4x2);
     deallocateMatrix(&output4x4);
 
-    return sum;
+    return (sum * pow((sumOfCtress + sumOfCdisp + 1), 1));
 }
