@@ -8,8 +8,6 @@
 #define NUM_OF_NODES 6
 #define DOF 2
 #define TOTAL_DOF 12 // DOF * NUM_OF_NODES
-#define TE_NUMCOLS 4
-#define TE_NUMROWs 2
 const double rho = 0.1; // density of material lb/in^3
 const int length = 360; //in
 
