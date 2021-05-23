@@ -40,6 +40,9 @@ const int indexA[NUM_OF_ELEMENTS] = {1, 1, 1, 1,
                                      11, 11, 11, 11, 11, 11,
                                      12, 12, 12 };
 
+const double minDisp = -2.0, maxDisp = 2.0;
+const double minStress = -180000000, maxStress = 180000000;
+
 double func(double *A)
 {
     extern const int D;
@@ -181,4 +184,59 @@ double func(double *A)
     }
 
     /*********************** Check constraints violation ******************************/
+    double Cdisp[NUM_OF_NODES*2], Cstress[NUM_OF_ELEMENTS];
+    double sumOfCdisp = 0, sumOfCtress = 0;
+
+    //Displacement constraints
+    for (int i = 0; i < NUM_OF_NODES*2; i++)
+    {
+        if ((minDisp <= U.pMatrix[i][0]) && (U.pMatrix[i][0] <= maxDisp))
+        {
+            Cdisp[i] = 0;
+        }
+        else
+        {
+            Cdisp[i] = fabs(((U.pMatrix[i][0] - maxDisp)/maxDisp));
+            //Cdisp[i] = U.pMatrix[i][0]; //aeDE paper
+        }
+        sumOfCdisp += Cdisp[i];
+    }
+
+    //Stress constraints
+    for (int i = 0; i < NUM_OF_ELEMENTS; i++)
+    {
+        if ((minStress <= stress_e[i]) && (stress_e[i] <= maxStress))
+        {
+            Cstress[i] = 0;
+        }
+        else
+        {
+            Cstress[i] = fabs((stress_e[i] - maxStress)/maxStress);
+            //Cstress[i] = stress_e[i];//aeDE paper
+        }
+        sumOfCtress += Cstress[i];
+    }
+
+    // calculate total weight
+    for (int i = 0; i < D; i++)
+    {
+        sum += getWeight(A[i]);
+    }
+    /* Deallocate */
+    deallocateMatrix(&temp);
+    deallocateMatrix(&Te);
+    deallocateMatrix(&Te_Transpose);
+    deallocateMatrix(&invK);
+    deallocateMatrix(&F);
+    deallocateMatrix(&ke2x2);
+    deallocateMatrix(&Be);
+    deallocateMatrix(&U);
+    deallocateMatrix(&disp_e);
+    deallocateMatrix(&de_o);
+    deallocateMatrix(&productOfBe_de);
+    deallocateMatrix(&matrix2x2_Precomputed);
+    deallocateMatrix(&output4x2);
+    deallocateMatrix(&output4x4);
+    
+    return (sum * pow((sumOfCtress + sumOfCdisp + 1), 1));
 }

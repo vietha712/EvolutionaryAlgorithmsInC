@@ -260,11 +260,11 @@ double func(double *A)
 
     /*********************** Check constraints violation ******************************/
 #if 1
-    double Cdisp[10], Cstress[10];
+    double Cdisp[12], Cstress[10];
     double sumOfCdisp = 0, sumOfCtress = 0;
 
     //Displacement constraints
-    for (int i = 0; i < NUM_OF_ELEMENTS; i++)
+    for (int i = 0; i < NUM_OF_NODES*2; i++)
     {
         if ((minDisp <= U.pMatrix[i][0]) && (U.pMatrix[i][0] <= maxDisp))
         {
@@ -279,7 +279,7 @@ double func(double *A)
     }
 
     //Stress constraints
-    for (int i = 0; i < NUM_OF_NODES; i++)
+    for (int i = 0; i < NUM_OF_ELEMENTS; i++)
     {
         if ((minStress <= stress_e[i]) && (stress_e[i] <= maxStress))
         {
