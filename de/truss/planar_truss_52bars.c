@@ -46,8 +46,10 @@ double func(double *A)
     int x[2], y[2];
     double l_ij, m_ij, le;
     double Ae[NUM_OF_ELEMENTS];
-    MatrixT K, F, Te, Te_Transpose;
-    MatrixT matrix2x2_Precomputed, ke2x2, output4x2, output4x4;
+    const int bcDOF[8] = {0, 1, 2, 3, 4, 5, 6, 7};
+    double bcValue[8] = {0};
+    MatrixT K, F, Te, Te_Transpose, U, invK, Be, disp_e, de_o, temp;
+    MatrixT matrix2x2_Precomputed, ke2x2, output4x2, output4x4, productOfBe_de;
 
     allocateMatrix(&K, TOTAL_DOF, TOTAL_DOF);
     allocateMatrix(&F, TOTAL_DOF, 1);
@@ -55,9 +57,15 @@ double func(double *A)
     allocateMatrix(&Te_Transpose, 4, 2);
     allocateMatrix(&ke2x2, 2, 2);
     allocateMatrix(&matrix2x2_Precomputed, 2, 2);
+    allocateMatrix(&Be, 1, 2);
+    allocateMatrix(&disp_e, 4, 1);
 
     initMatrix(&output4x2);
     initMatrix(&output4x4);
+    initMatrix(&invK);
+    initMatrix(&U);
+    initMatrix(&de_o);
+    initMatrix(&productOfBe_de);
 
     matrix2x2_Precomputed.pMatrix[0][0] = 1;
     matrix2x2_Precomputed.pMatrix[0][1] = -1;
@@ -108,4 +116,69 @@ double func(double *A)
                 K.pMatrix[index[row_i]][index[col_i]] =  K.pMatrix[index[row_i]][index[col_i]] + output4x4.pMatrix[row_i][col_i];
         }
     }
+
+    F.pMatrix[32][0] = Px;
+    F.pMatrix[33][0] = Py;
+    F.pMatrix[34][0] = Px;
+    F.pMatrix[35][0] = Py;
+    F.pMatrix[36][0] = Px;
+    F.pMatrix[37][0] = Py; 
+    F.pMatrix[38][0] = Px;
+    F.pMatrix[39][0] = Py;
+
+    for (int bc_i = 0; bc_i < 8; bc_i++)
+    {
+        int temp = bcDOF[bc_i];
+        for (int zeros_i = 0; zeros_i < TOTAL_DOF; zeros_i++)
+            K.pMatrix[temp][zeros_i] = 0;
+
+        K.pMatrix[temp][temp] = 1;
+        F.pMatrix[temp][0] = bcValue[bc_i];
+    }
+
+    //Calculate U = K\F. inv(K)*F
+    LU_getInverseMatrix(&K, &invK);
+    multiplyMatrices(&invK, &F, &U); //U is nodal displacement of each element //Pass U
+
+    /* Compute stress for each element */
+    for (int i = 0; i < NUM_OF_ELEMENTS; i++)
+    {
+        x[0] = gCoord[0][element[i][0] - 1];
+        x[1] = gCoord[0][element[i][1] - 1];
+        y[0] = gCoord[1][element[i][0] - 1];
+        y[1] = gCoord[1][element[i][1] - 1];
+
+        le = sqrt( pow((x[1] - x[0]), 2) + pow((y[1] - y[0]), 2) ); //
+
+        //Compute direction cosin
+        l_ij = (x[1] - x[0])/le;
+        m_ij = (y[1] - y[0])/le;
+
+        //Compute transform matrix
+        Te.pMatrix[0][0] = l_ij; Te.pMatrix[0][1] = m_ij; Te.pMatrix[0][2] = 0; Te.pMatrix[0][3] = 0;
+        Te.pMatrix[1][0] = 0; Te.pMatrix[1][1] = 0; Te.pMatrix[1][2] = l_ij; Te.pMatrix[1][3] = m_ij;
+
+        //compute strain matrix
+        Be.pMatrix[0][0] = -1/le;
+        Be.pMatrix[0][1] = 1/le;
+        
+        //Compute displacement of each bar
+        index[0] = 2*element[i][0] - 1 - 1;
+        index[1] = 2*element[i][0] - 1;
+        index[2] = 2*element[i][1] - 1 - 1;
+        index[3] = 2*element[i][1] - 1;
+        disp_e.pMatrix[0][0] = U.pMatrix[index[0]][0];
+        disp_e.pMatrix[1][0] = U.pMatrix[index[1]][0];
+        disp_e.pMatrix[2][0] = U.pMatrix[index[2]][0];
+        disp_e.pMatrix[3][0] = U.pMatrix[index[3]][0];
+
+        multiplyMatrices(&Te, &disp_e, &de_o);
+        //compute stress of element
+        multiplyMatrices(&Be, &de_o, &productOfBe_de);
+
+        multiplyScalarMatrix(E, &productOfBe_de, &temp); //1x1
+        stress_e[i] = temp.pMatrix[0][0];
+    }
+
+    /*********************** Check constraints violation ******************************/
 }
