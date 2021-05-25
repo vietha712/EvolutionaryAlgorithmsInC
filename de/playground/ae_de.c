@@ -102,7 +102,6 @@ void run_aeDE(int numOfPop,
    double **pPop, **pNext, **ptr, **U, **unionSet = NULL, *sortedArray = NULL;
    double CR = 0.7, F = 0.7, delta = 0.0, minValue = DBL_MAX, fMean = 0.0;
    char *ofile = NULL;
-   FILE *fid;
    clock_t startTime, endTime;
 
    if (s) INITRAND;
@@ -300,24 +299,6 @@ void run_aeDE(int numOfPop,
    /* Stopping timer	*/
    endTime = clock();
    result->executionTime = (double)(endTime - startTime)/(double)CLOCKS_PER_SEC;
-
-   /* If user has defined output file, the whole final pPopation is
-      saved to the file						*/
-   if (ofile != NULL)
-   {
-      if ((fid=(FILE *)fopen(ofile,"a")) == NULL)
-      {
-         fprintf(stderr,"Error in opening file %s\n\n",ofile);
-      }
-
-      for (i=0; i < numOfPop; i++)
-      {
-         for (j=0; j <= varDimension; j++)
-            fprintf(fid, "%.15e ", pPop[i][j]);
-         fprintf(fid, "\n");
-      }
-      fclose(fid);
-   }
 
    /* Finding best individual	*/
    for (minValue = DBL_MAX, i = 0; i < numOfPop; i++)
