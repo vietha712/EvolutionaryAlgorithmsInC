@@ -93,15 +93,13 @@ void run_aeDE(int numOfPop,
               float tolerance,
               int varDimension,
               problemT *problemCtx,
-              resultT *result,
-              int isMinimized)
+              resultT *result)
 {
    register int i, j, l, k, m, r1, r2, r3, best, jrand, numOfFuncEvals = 0;
    //extern double Xl[], Xu[];
    int lenOfUnionSet = numOfPop*2, index = -1, s = 1;
    double **pPop, **pNext, **ptr, **U, **unionSet = NULL, *sortedArray = NULL;
    double CR = 0.7, F = 0.7, delta = 0.0, minValue = DBL_MAX, fMean = 0.0;
-   char *ofile = NULL;
    clock_t startTime, endTime;
 
    if (s) INITRAND;
@@ -314,7 +312,7 @@ void run_aeDE(int numOfPop,
       result->optimizedVars[copyingInx] = pPop[index][copyingInx];
 
    result->fitnessVal = pPop[index][varDimension];
-   result->numOfEvals = numOfFuncEvals;
+   result->iteration = iter;
 
    /* Freeing dynamically allocated memory	*/
 

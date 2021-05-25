@@ -59,8 +59,7 @@ void run_aeDE(int numOfPop,
               float tolerance,
               int varDimension,
               problemT *problemCtx,
-              resultT *result,
-              int isMinimized);
+              resultT *result);
 
 void run_parallel_aeDE(int numOfPop,
                        int iter,

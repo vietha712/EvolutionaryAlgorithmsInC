@@ -4,6 +4,8 @@
 
 #define NP (int)60
 #define MAXITER (int)1500
+#define THRESHOLD 0.001
+#define TOLE 0.00001
 
 double func(double *);
 
@@ -26,8 +28,13 @@ int main(void)
     resultStorage.fitnessVal = 0.0;
     resultStorage.iteration = 0;
 
-
+#if 0
     run_parallel_aeDE(NP, MAXITER, D, &problemDefinitions, &resultStorage, TRUE);
+#endif
+
+#if 1
+    run_aeDE(NP, MAXITER, THRESHOLD, TOLE, D, &problemDefinitions, &resultStorage);
+#endif
 
     /* Printing out information about optimization process for the user	*/
     printf("Execution time: %.4f s\n", resultStorage.executionTime);
