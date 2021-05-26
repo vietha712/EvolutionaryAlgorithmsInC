@@ -12,6 +12,7 @@ static double getBest1(double *, double *, double *, double );
 static void swap(double *a, double *b);
 static double partition(double array[], int low, int high);
 static void quickSort(double array[], int low, int high);
+void fix(double *, int );
 static void executeEvolutionOverOnePop(problemT *ctx,
                                        mutationSchemeT mutationOp,
                                        double **pPop,
@@ -203,9 +204,8 @@ static void executeEvolutionOverOnePop(problemT *ctx,
             U[j] = pPop[popIndex][j];
          }
       }
-#ifdef TRUSS_PROBLEM
+      
       fix(U, varDimension); // make the value to be in discrete type
-#endif /* #if (TRUSS_PROBLEM == ENALBED) */
       U[varDimension] = ctx->penaltyFunc(&U[0]); // Evaluate trial vectors
 
       /* Comparing the trial vector 'U' and the old individual
@@ -325,7 +325,7 @@ void run_parallel_aeDE(int numOfPop,
    double **pPop, **pElitePop, **pSubPop2, **pSubNext2, *U2;
    double **pSubPop1, **pSubNext1, *U1;
    double **pSubPop3, **pSubNext3, *U3; 
-   double CR = 0.0, F = 0.5, minValue = DBL_MAX;
+   double CR = 0.6, F = 1, minValue = DBL_MAX;
    double startTime, endTime;
 
    if (s) INITRAND;
@@ -380,9 +380,7 @@ void run_parallel_aeDE(int numOfPop,
                      (problemCtx->upperConstraints[j] - problemCtx->lowerConstraints[j])*URAND;
 
       /* Evaluate the fitness for each individual */
-#ifdef TRUSS_PROBLEM
       fix(pPop[popIndex], varDimension);
-#endif
       pPop[popIndex][varDimension] = problemCtx->penaltyFunc(pPop[popIndex]);
    } /* for (popIndex = 0; popIndex < numOfPop; popIndex++) */
 
@@ -413,75 +411,63 @@ void run_parallel_aeDE(int numOfPop,
    /* The main loop of the algorithm	*/
    for (mainIndex = 0; mainIndex < iter; mainIndex++)
    {
-      #pragma omp parallel sections shared(F, CR, subPopSize)
-      {
-         #pragma omp section
-         {
-            executeEvolutionOverOnePop(problemCtx,
-                                       BEST_1,
-                                       pSubPop1,
-                                       pSubNext1,
-                                       U1,
-                                       F,
-                                       CR,
-                                       subPopSize,
-                                       varDimension);
-         }
-      
-         #pragma omp section
-         {
-            executeEvolutionOverOnePop(problemCtx,
-                                       CURRENT_TO_BEST,
-                                       pSubPop2,
-                                       pSubNext2,
-                                       U2,
-                                       F,
-                                       CR,
-                                       subPopSize,
-                                       varDimension);            
-         }
+      executeEvolutionOverOnePop(problemCtx,
+                                 BEST_1,
+                                 pSubPop1,
+                                 pSubNext1,
+                                 U1,
+                                 F,
+                                 CR,
+                                 subPopSize,
+                                 varDimension);
 
-         #pragma omp section
-         {
-            executeEvolutionOverOnePop(problemCtx,
-                                       RAND_1,
-                                       pSubPop3,
-                                       pSubNext3,
-                                       U3,
-                                       F,
-                                       CR,
-                                       subPopSize,
-                                       varDimension);
-         }
-      }
+      executeEvolutionOverOnePop(problemCtx,
+                                 CURRENT_TO_BEST,
+                                 pSubPop2,
+                                 pSubNext2,
+                                 U2,
+                                 F,
+                                 CR,
+                                 subPopSize,
+                                 varDimension);            
+
+      executeEvolutionOverOnePop(problemCtx,
+                                 RAND_1,
+                                 pSubPop3,
+                                 pSubNext3,
+                                 U3,
+                                 F,
+                                 CR,
+                                 subPopSize,
+                                 varDimension);
+
       /**** Construct elite pop and update sub-pops ****/
-
-      /* Merge three sub-pops */
-      for (int copyingIndex = 0; copyingIndex < subPopSize; copyingIndex++)
+      if ((mainIndex%10) == 0)
       {
-         for (int copyingIndex2 = 0; copyingIndex2 <= varDimension; copyingIndex2++)
-            pPop[copyingIndex][copyingIndex2] = pSubPop1[copyingIndex][copyingIndex2];                         
-      }
+         /* Merge three sub-pops */
+         for (int copyingIndex = 0; copyingIndex < subPopSize; copyingIndex++)
+         {
+            for (int copyingIndex2 = 0; copyingIndex2 <= varDimension; copyingIndex2++)
+               pPop[copyingIndex][copyingIndex2] = pSubPop1[copyingIndex][copyingIndex2];                         
+         }
+         for (int copyingIndex = 0; copyingIndex < subPopSize; copyingIndex++)
+         {
+            for (int copyingIndex2 = 0; copyingIndex2 <= varDimension; copyingIndex2++)
+               pPop[(copyingIndex+subPopSize)][copyingIndex2] = pSubPop2[copyingIndex][copyingIndex2];
+         }
+         for (int copyingIndex = 0; copyingIndex < subPopSize; copyingIndex++)
+         {
+            for (int copyingIndex2 = 0; copyingIndex2 <= varDimension; copyingIndex2++)
+               pPop[(copyingIndex+subPopSize+subPopSize)][copyingIndex2] = pSubPop3[copyingIndex][copyingIndex2];
+         }
 
-      for (int copyingIndex = 0; copyingIndex < subPopSize; copyingIndex++)
-      {
-         for (int copyingIndex2 = 0; copyingIndex2 <= varDimension; copyingIndex2++)
-            pPop[(copyingIndex+subPopSize)][copyingIndex2] = pSubPop2[copyingIndex][copyingIndex2];
+         applyEliteStrategy(pPop, pSubPop1, pSubPop2, pSubPop3, varDimension, numOfPop);
+         CR -= 0.01;
+         F -= 0.01;
       }
-
-      for (int copyingIndex = 0; copyingIndex < subPopSize; copyingIndex++)
-      {
-         for (int copyingIndex2 = 0; copyingIndex2 <= varDimension; copyingIndex2++)
-            pPop[(copyingIndex+subPopSize+subPopSize)][copyingIndex2] = pSubPop3[copyingIndex][copyingIndex2];
-      }
-
-      applyEliteStrategy(pPop, pSubPop1, pSubPop2, pSubPop3, varDimension, numOfPop);
       
-#ifndef TRUSS_PROBLEM
-      if(1 == isSatisfiedRastrigin(pPop, numOfPop, varDimension))
-         break;
-#endif
    } /* Main loop */
+
 
    /* Calculating and output results */
 
