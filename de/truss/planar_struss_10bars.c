@@ -9,7 +9,6 @@
 #define DOF 2
 #define TOTAL_DOF 12 // DOF * NUM_OF_NODES
 const double rho = 0.1; // density of material lb/in^3
-const int length = 360; //in
 
 void getTransposeOfTe(MatrixT* inputMat, MatrixT* outputMat);
 
@@ -36,7 +35,7 @@ int gCoord[2][6] = {{720, 720, 360, 360, 0, 0},
 double Xl[NUM_OF_ELEMENTS] = {1.62,1.62,1.62,1.62,1.62,1.62,1.62,1.62,1.62,1.62},
        Xu[NUM_OF_ELEMENTS] = {33.50,33.50,33.50,33.50,33.50,33.50,33.50,33.50,33.50,33.50};
 
-inline double getWeight(double A)
+inline double getWeight(double A, int length)
 {
     return (A * rho * length);
 }
@@ -94,7 +93,7 @@ double findMaxMemInArray(double *array, int length)
 
 const double epsilon_1 = 1.0;
 double epsilon_2 = 20.0;
-int E = 10000000;
+int E = 10000000; //N/m2
 int P = 100000;
 const int D = 10;
 const double minDisp = -2.0, maxDisp = 2.0;
@@ -294,9 +293,13 @@ double func(double *A)
     }
 #endif
     // calculate total weight
-    for (int i = 0; i < D; i++)
+    for (int i = 0; i < (D-4); i++)
     {
-        sum += getWeight(A[i]);
+        sum += getWeight(A[i], 360);
+    }
+    for (int i = (D-4) ; i < 10; i++)
+    {
+        sum += getWeight(A[i], 509.12);
     }
 #if 0 //MATLAB
     sumOfCdisp = findMaxMemInArray(Cdisp, 10);
