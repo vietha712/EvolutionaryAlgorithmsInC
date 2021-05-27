@@ -310,7 +310,7 @@ int main(int argc, char **argv)
    printf("Number of objective function evaluations: %d\n", numOfFuncEvals);
    printf("Solution:\nValues of variables: ");
    for (i=0; i < D; i++)
-      printf("%.2f ", pPop[index][i]);
+      printf("%.3f ", pPop[index][i]);
 
 
    printf("\nObjective function value: ");

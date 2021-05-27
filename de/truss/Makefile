@@ -1,8 +1,11 @@
 # Utilities
-PROJ := test_main
+PROJ := main
 
 # Problem
 PROBLEM := planar_truss_10bars
+
+#Optimization algorithm
+ALGO := parallel_aeDE
 
 #LIB
 LIB := matrix
@@ -18,13 +21,13 @@ INCLUDES := $(INC_PATH)
 
 # Compiler
 CC := gcc
-CC_OPT := -Wall -pedantic -O3 -funroll-loops
+CC_OPT := -Wall -pedantic -O3 -funroll-loops -fopenmp
 
 # Search paths
 vpath %.c $(SRC_PATH)
 
 #OBJECT FILES
-OBJ_FILES := $(OUTPUT_PATH)/$(PROBLEM).o $(OUTPUT_PATH)/$(LIB).o
+OBJ_FILES := $(OUTPUT_PATH)/$(PROBLEM).o $(OUTPUT_PATH)/$(LIB).o $(OUTPUT_PATH)/$(ALGO).o
 
 # Commands
 
@@ -38,14 +41,23 @@ build: $(PROJ).c $(OBJ_FILES)
 $(OUTPUT_PATH)/$(LIB).o: $(LIB).c
 	@$(CC) -c $(CC_OPT) $< -o $(OUTPUT_PATH)/$(LIB).o
 
+$(OUTPUT_PATH)/$(ALGO).o: $(ALGO).c
+	@$(CC) -c $(CC_OPT) $< -o $(OUTPUT_PATH)/$(ALGO).o
+
 $(OUTPUT_PATH)/$(PROBLEM).o: $(PROBLEM).c build-dir
 	@$(CC) -c $(CC_OPT) $< -o $(OUTPUT_PATH)/$(PROBLEM).o
 
 build_test:
-	gcc -Wall -g -pedantic -O -o test_main.exe test_main.c planar_struss_10bars.c matrix.c -lm
+	gcc -Wall -g -pedantic -O3 -o test_main.exe test_main.c planar_truss_52bars.c matrix.c -lm
 
-build_de:
+build_de_ten_bars:
 	gcc -Wall -pedantic -O -o de de.c planar_struss_10bars.c matrix.c -lm
+
+build_de_five_two_bars:
+	gcc -Wall -pedantic -O -o de de.c planar_truss_52bars.c matrix.c -lm
+
+run_truss:
+	./de -N 30 -G 2000 -C 0.6 -F 1.0
 
 build-dir:
 	@mkdir -p $(OUTPUT_PATH)

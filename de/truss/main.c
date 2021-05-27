@@ -2,10 +2,10 @@
 /* Definition for user settings */
 /* Definition for a threshold of mutation scheme */
 
-#define NP (int)60
-#define MAXITER (int)1500
+#define NP (int)20
+#define MAXITER (int)2000
 #define THRESHOLD 0.001
-#define TOLE 0.00001
+#define TOLE 0.000001
 
 double func(double *);
 
@@ -28,11 +28,11 @@ int main(void)
     resultStorage.fitnessVal = 0.0;
     resultStorage.iteration = 0;
 
-#if 0
-    run_parallel_aeDE(NP, MAXITER, D, &problemDefinitions, &resultStorage, TRUE);
+#if 1
+    run_parallel_aeDE(30, MAXITER, D, &problemDefinitions, &resultStorage, TRUE);
 #endif
 
-#if 1
+#if 0
     run_aeDE(NP, MAXITER, THRESHOLD, TOLE, D, &problemDefinitions, &resultStorage);
 #endif
 
@@ -42,9 +42,9 @@ int main(void)
 
     printf("Solution:\nValues of variables: ");
     for (int i = 0; i < D; i++)
-       printf("%.15f ", resultStorage.optimizedVars[i]);
+       printf("%.2f ", resultStorage.optimizedVars[i]);
     printf("\nObjective function value: ");
-    printf("%.15f\n", resultStorage.fitnessVal);
+    printf("%.2f\n", resultStorage.fitnessVal);
 
     return 0;
 }
