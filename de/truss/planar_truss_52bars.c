@@ -9,13 +9,56 @@
 #define DOF 2
 #define TOTAL_DOF 40
 
-const double standard_A[42] = {};
+#if 1
+
+const double standard_A[64] = {71.613, 90.968, 126.451, 161.29, 198.064, 252.258, 285.161, 363.225, 388.386, 494.193,
+                               506.451, 641.289, 645.16, 792.256, 816.773, 939.998, 1008.385,
+                               1045.159, 1161.288, 1283.868, 1374.191, 1535.481, 1690.319, 1696.771, 1858.061,
+                               1890.319, 1993.544, 2019.351, 2180.641, 2238.705, 2290.318, 2341.931, 2477.414,
+                               2496.769, 2503.221, 2696.769, 2722.575, 2896.768, 2961.284, 3096.768, 3206.445,
+                               3303.219, 3703.218, 4658.055, 5141.925, 5503.215, 5999.988, 6999.986, 7419.340, 8709.660, 8967.724, 9161.272,
+                               9999.980, 10322.560, 10903.204, 12129.008, 12838.684, 14193.520, 14774.164, 15806.420, 17096.740, 18064.480, 19354.800, 21612.860};
+
+
+double Xl[NUM_OF_ELEMENTS] = {71.613,71.613,71.613,71.613,71.613,71.613,71.613,71.613,71.613,71.613,
+                              71.613,71.613,71.613,71.613,71.613,71.613,71.613,71.613,71.613,71.613,
+                              71.613,71.613,71.613,71.613,71.613,71.613,71.613,71.613,71.613,71.613,
+                              71.613,71.613,71.613,71.613,71.613,71.613,71.613,71.613,71.613,71.613,
+                              71.613,71.613,71.613,71.613,71.613,71.613,71.613,71.613,71.613,71.613,
+                              71.613,71.613},
+
+       Xu[NUM_OF_ELEMENTS] = {21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,
+                              21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,
+                              21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,
+                              21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,
+                              21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,
+                              21612.860,21612.860};
+#endif
+
+#if 0
+const double standard_A[64] = {0.111, 0.141, 0.196, 0.25, 0.307, 0.391, 0.442, 0.563, 0.602, 0.766,
+                      0.785, 0.994, 1.00, 1.228, 1.266, 1.457, 1.563,
+                      1.62, 1.80, 1.99, 2.13, 2.38, 2.62, 2.63, 2.88, 2.93, 3.09, 3.13, 3.38,
+                      3.47, 3.55, 3.63, 3.84, 3.87, 3.88, 4.18, 4.22, 4.49, 4.59, 4.80, 4.97,
+                      5.12, 5.74, 7.22, 7.97, 8.53, 9.3, 10.85, 11.50, 13.50, 13.90, 14.20, 15.50, 16.00, 16.90,
+                      18.80, 19.90, 22.00, 22.90, 24.5, 26.50, 28.0, 30.00, 33.50}; //Standard cross-sectional areas for design variable in^2
+
+double Xl[NUM_OF_ELEMENTS] = {0.111,0.111,0.111,0.111,0.111,0.111,0.111,0.111,0.111,0.111,
+                              0.111,0.111,0.111,0.111,0.111,0.111,0.111,0.111,0.111,0.111,
+                              0.111,0.111,0.111,0.111,0.111,0.111,0.111,0.111,0.111,0.111,
+                              0.111,0.111,0.111,0.111,0.111,0.111,0.111,0.111,0.111,0.111,
+                              0.111,0.111,0.111,0.111,0.111,0.111,0.111,0.111,0.111,0.111,
+                              0.111,0.111},
+
+       Xu[NUM_OF_ELEMENTS] = {33.50,33.50,33.50,33.50,33.50,33.50,33.50,33.50,33.50,33.50,
+                              33.50,33.50,33.50,33.50,33.50,33.50,33.50,33.50,33.50,33.50,
+                              33.50,33.50,33.50,33.50,33.50,33.50,33.50,33.50,33.50,33.50,
+                              33.50,33.50,33.50,33.50,33.50,33.50,33.50,33.50,33.50,33.50,
+                              33.50,33.50,33.50,33.50,33.50,33.50,33.50,33.50,33.50,33.50,
+                              33.50,33.50};
+#endif
 
 const int D = 12;
-
-const double E = 207000000000.000; // N/m2
-const double Px = 100000;
-const double Py = 200000;
 
 const int gCoord[2][20] = { {0, 2, 4, 6, 0, 2, 4, 6, 0, 2, 4, 6, 0, 2, 4, 6, 0, 2, 4, 6},
                             {0, 0, 0, 0, 3, 3, 3, 3, 6, 6, 6, 6, 9, 9, 9, 9, 12, 12, 12, 12} };
@@ -26,6 +69,8 @@ const int element[NUM_OF_ELEMENTS][2] =
   {10, 11}, {11, 12}, {9, 13}, {10, 14}, {11, 15}, {12, 16}, {10, 13}, {9, 14}, {11, 14}, {10, 15}, {12, 15}, {11, 16},
   {13, 14}, {14, 15}, {15, 16}, {13, 17}, {14, 18}, {15, 19}, {16, 20}, {14, 17}, {13, 18}, {15, 18}, {14, 19}, {16, 19},
   {15, 20}, {17, 18}, {18, 19}, {19, 20} };
+
+double stress_e[NUM_OF_ELEMENTS] = {0};
 
 const int indexA[NUM_OF_ELEMENTS] = {1, 1, 1, 1, 
                                      2, 2, 2, 2, 2, 2, 
@@ -40,15 +85,82 @@ const int indexA[NUM_OF_ELEMENTS] = {1, 1, 1, 1,
                                      11, 11, 11, 11, 11, 11,
                                      12, 12, 12 };
 
-const double minDisp = -2.0, maxDisp = 2.0;
+const double minDisp = -0.0508, maxDisp = 0.0508; //in
 const double minStress = -180000000, maxStress = 180000000;
+const double rho = 7860; //kg/m3
+//const double rho = 0.284; //lb/in3
+const double E = 207000000000.000; // N/m2
+const double Px = 100000; //N
+const double Py = 200000; //N
 
+inline double getWeight(double A, int length)
+{
+    return (A * rho * length);
+}
+
+void fix(double *X, int length)
+{
+    double temp1, temp2;
+
+    for (int i=0; i<length; i++)
+    {
+        while (X[i] < Xl[i] || X[i] > Xu[i])
+        {
+            if (X[i] < Xl[i]) X[i] = 2.0*Xl[i] - X[i];
+            if (X[i] > Xu[i]) X[i] = 2.0*Xu[i] - X[i];
+        }
+    }
+
+    for (int i = 0; i < length; i++)
+    {
+        for (int j = 0; j < 64; j++)
+        {
+            if ((X[i] > standard_A[j]))
+            {
+                continue;
+            }
+            else
+            {
+                temp1 = X[i] - standard_A[j];
+                temp2 = X[i] - standard_A[j - 1];
+                X[i] = (fabs(temp1) <= fabs(temp2)) ? standard_A[j] : standard_A[j - 1];
+                break;
+            }
+        }
+    }
+}
+
+void getTransposeOfTe(MatrixT* inputMat, MatrixT* outputMat)
+{
+    int i, j;
+    allocateMatrix(outputMat, inputMat->cols, inputMat->rows);
+    for (i = 0; i < inputMat->cols; i++)
+        for (j = 0; j < inputMat->rows; j++)
+            outputMat->pMatrix[i][j] = inputMat->pMatrix[j][i];
+}
+
+static void convertMilliMeterToMeter(double *A, double *meterA)
+{
+    for (int i = 0; i < D; i++)
+    {
+        meterA[i] = A[i] * 0.000001;
+    }
+}
+
+/*
+ * @in: A is in mm2
+ * A is then converted to m2 for our problem calculation
+ * @out: the weight corresponding to the given problem.
+ */
 double func(double *A)
 {
     extern const int D;
+    double sum = 0.0;
     int x[2], y[2];
+    int index[4];
     double l_ij, m_ij, le;
     double Ae[NUM_OF_ELEMENTS];
+    double meterSquare_A[12];
     const int bcDOF[8] = {0, 1, 2, 3, 4, 5, 6, 7};
     double bcValue[8] = {0};
     MatrixT K, F, Te, Te_Transpose, U, invK, Be, disp_e, de_o, temp;
@@ -77,10 +189,13 @@ double func(double *A)
     zerosMatrix(&K);
     zerosMatrix(&F);
 
-    /* Get A for each element */
+    /* Convert the unit for A */
+    convertMilliMeterToMeter(A, meterSquare_A); //Pass
+
+    /* Get A for each element */ //Pass
     for (int i = 0; i < NUM_OF_ELEMENTS; i++)
     {
-        Ae[i] = A[indexA[i]];
+        Ae[i] = meterSquare_A[indexA[i] - 1];
     }
 
     /* Compute stiffness matrix */
@@ -216,12 +331,36 @@ double func(double *A)
         }
         sumOfCtress += Cstress[i];
     }
-
-    // calculate total weight
-    for (int i = 0; i < D; i++)
+    
+    // TODO: calculate total weight
+    double sum1 = 0.0;
+    double sum2 = 0.0;
+    double sum3 = 0.0;
+    double sum4 = 0.0;
+    for (int i = 0; i < 4; i++)
     {
-        sum += getWeight(A[i]);
+        sum1 = sum1 + (Ae[i] * rho * 3.0);
+        sum2 = sum2 + (Ae[13+i] * rho * 3.0);
+        sum3 = sum3 + (Ae[26+i] * rho * 3.0);
+        sum4 = sum4 + (Ae[39+i] * rho * 3.0);
     }
+
+    for (int i = 0; i < 6; i++)
+    {
+        sum1 = sum1 + (Ae[4+i] * rho * 3.6);
+        sum2 = sum2 + (Ae[17+i] * rho * 3.6);
+        sum3 = sum3 + (Ae[30+i] * rho * 3.6);
+        sum4 = sum4 + (Ae[43+i] * rho * 3.6);
+    }
+
+    for (int i = 0; i < 3; i++)
+    {
+        sum1 = sum1 + (Ae[10+i] * rho * 2.0);
+        sum2 = sum2 + (Ae[23+i] * rho * 2.0);
+        sum3 = sum3 + (Ae[36+i] * rho * 2.0);
+        sum4 = sum4 + (Ae[49+i] * rho * 2.0);
+    }
+    sum = sum1 +sum2+sum3+sum4;
     /* Deallocate */
     deallocateMatrix(&temp);
     deallocateMatrix(&Te);
@@ -237,6 +376,6 @@ double func(double *A)
     deallocateMatrix(&matrix2x2_Precomputed);
     deallocateMatrix(&output4x2);
     deallocateMatrix(&output4x4);
-    
+
     return (sum * pow((sumOfCtress + sumOfCdisp + 1), 1));
 }
