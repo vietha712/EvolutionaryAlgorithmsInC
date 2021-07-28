@@ -37,7 +37,7 @@ int main(void)
 #endif
 
     /* Printing out information about optimization process for the user	*/
-    printf("Execution time: %.4f s\n", resultStorage.executionTime);
+    printf("Execution time: %.6f s\n", resultStorage.executionTime);
     printf("Stop at iteration: %d\n", resultStorage.iteration);
 
     printf("Solution:\nValues of variables: ");
