@@ -48,7 +48,7 @@ typedef enum mutationSchemeTag
 {
     RAND_1,
     CURRENT_TO_BEST,
-    BEST_1,
+    BEST_2,
 }mutationSchemeT;
 
 
@@ -66,6 +66,8 @@ void run_parallel_aeDE(int numOfPop,
                        int varDimension,
                        problemT *problemCtx,
                        resultT *result,
+                       int updateRate,
+                       float decrementVal,
                        int isMinimized);
 
 #endif

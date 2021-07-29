@@ -2,7 +2,7 @@
 PROJ := main
 
 # Problem
-PROBLEM := rastrigin_20d_skewed
+PROBLEM := schwefel_12d
 
 # Algorithms
 ALGO := parallel_aeDE

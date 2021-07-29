@@ -2,10 +2,12 @@
 /* Definition for user settings */
 /* Definition for a threshold of mutation scheme */
 
-#define NP (int)60
-#define MAXITER (int)1500
+#define NP (int)600
+#define MAXITER (int)20000
 #define THRESHOLD 0.001
 #define TOLE 0.00001
+#define UPDATE_RATE 2000
+#define DECREMENT_VALUE 0.01f
 
 double func(double *);
 
@@ -28,11 +30,11 @@ int main(void)
     resultStorage.fitnessVal = 0.0;
     resultStorage.iteration = 0;
 
-#if 0
-    run_parallel_aeDE(NP, MAXITER, D, &problemDefinitions, &resultStorage, TRUE);
+#if 1
+    run_parallel_aeDE(NP, MAXITER, D, &problemDefinitions, &resultStorage, UPDATE_RATE, DECREMENT_VALUE, TRUE);
 #endif
 
-#if 1
+#if 0
     run_aeDE(NP, MAXITER, THRESHOLD, TOLE, D, &problemDefinitions, &resultStorage);
 #endif
 
