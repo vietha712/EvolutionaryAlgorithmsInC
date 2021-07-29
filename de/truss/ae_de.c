@@ -8,6 +8,7 @@ static void swap(double *a, double *b);
 static double partition(double array[], int low, int high);
 static void quickSort(double array[], int low, int high);
 static int isArrayIdentical(double array1[], double array2[], int length);
+void fix(double *, int );
 
 /* Definition for random number generator initialization	*/
 
@@ -143,6 +144,7 @@ void run_aeDE(int numOfPop,
                      (problemCtx->upperConstraints[j] - problemCtx->lowerConstraints[j])*URAND;
 
       /* Evaluate the fitness for each individual */
+      fix(pPop[i], varDimension);
       pPop[i][varDimension] = problemCtx->penaltyFunc(pPop[i]); //func(pPop[i]);
       numOfFuncEvals++;
 
@@ -209,6 +211,7 @@ void run_aeDE(int numOfPop,
             }
          }
 
+         fix(U[i], varDimension);
          U[i][varDimension] = problemCtx->penaltyFunc(&U[i][0]); // Evaluate trial vectors | line 21
          numOfFuncEvals++;
       }	/* End of the going through whole population	*/

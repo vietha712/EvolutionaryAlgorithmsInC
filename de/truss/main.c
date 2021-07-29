@@ -2,12 +2,10 @@
 /* Definition for user settings */
 /* Definition for a threshold of mutation scheme */
 
-#define NP (int)600
-#define MAXITER (int)20000
+#define NP (int)20
+#define MAXITER (int)2000
 #define THRESHOLD 0.001
-#define TOLE 0.00001
-#define UPDATE_RATE 2000
-#define DECREMENT_VALUE 0.01f
+#define TOLE 0.000001
 
 double func(double *);
 
@@ -31,7 +29,7 @@ int main(void)
     resultStorage.iteration = 0;
 
 #if 1
-    run_parallel_aeDE(NP, MAXITER, D, &problemDefinitions, &resultStorage, UPDATE_RATE, DECREMENT_VALUE, TRUE);
+    run_parallel_aeDE(30, MAXITER, D, &problemDefinitions, &resultStorage, TRUE);
 #endif
 
 #if 0
@@ -39,14 +37,14 @@ int main(void)
 #endif
 
     /* Printing out information about optimization process for the user	*/
-    printf("Execution time: %.6f s\n", resultStorage.executionTime);
+    printf("Execution time: %.4f s\n", resultStorage.executionTime);
     printf("Stop at iteration: %d\n", resultStorage.iteration);
 
     printf("Solution:\nValues of variables: ");
     for (int i = 0; i < D; i++)
-       printf("%.15f ", resultStorage.optimizedVars[i]);
+       printf("%.2f ", resultStorage.optimizedVars[i]);
     printf("\nObjective function value: ");
-    printf("%.15f\n", resultStorage.fitnessVal);
+    printf("%.2f\n", resultStorage.fitnessVal);
 
     return 0;
 }

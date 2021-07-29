@@ -2,7 +2,7 @@
 PROJ := main
 
 # Problem
-PROBLEM := rastrigin_20d
+PROBLEM := schwefel_12d
 
 # Algorithms
 ALGO := parallel_aeDE
@@ -19,7 +19,7 @@ INCLUDES := $(INC_PATH)
 
 # Compiler
 CC := gcc
-CC_OPT := -Wall -pedantic -O3 -funroll-loops -fopenmp
+CC_OPT := -Wall -pedantic -funroll-loops -O3 -fopenmp
 
 # Search paths
 vpath %.c $(SRC_PATH)
@@ -29,6 +29,9 @@ OBJ_FILES := $(OUTPUT_PATH)/$(PROBLEM).o $(OUTPUT_PATH)/$(ALGO).o
 
 #DEFINES
 DEF :=
+#-DELITIST_SELECTION
+
+CC_OPT += $(DEF)
 
 # Commands
 
