@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <assert.h>
-#include "matrix.cuh"
+#include "matrix_improved.cuh"
 
 #define NUM_OF_ELEMENTS 52
 #define NUM_OF_NODES 20
@@ -11,57 +11,6 @@
 #define TOTAL_DOF 40
 
 __host__ __device__ static void getTransposeOfTe1D(Matrix1DT* inputMat, Matrix1DT* outputMat);
-
-#if 0
-
-const float standard_A[64] = {71.613, 90.968, 126.451, 161.29, 198.064, 252.258, 285.161, 363.225, 388.386, 494.193,
-                               506.451, 641.289, 645.16, 792.256, 816.773, 939.998, 1008.385,
-                               1045.159, 1161.288, 1283.868, 1374.191, 1535.481, 1690.319, 1696.771, 1858.061,
-                               1890.319, 1993.544, 2019.351, 2180.641, 2238.705, 2290.318, 2341.931, 2477.414,
-                               2496.769, 2503.221, 2696.769, 2722.575, 2896.768, 2961.284, 3096.768, 3206.445,
-                               3303.219, 3703.218, 4658.055, 5141.925, 5503.215, 5999.988, 6999.986, 7419.340, 8709.660, 8967.724, 9161.272,
-                               9999.980, 10322.560, 10903.204, 12129.008, 12838.684, 14193.520, 14774.164, 15806.420, 17096.740, 18064.480, 19354.800, 21612.860};
-
-
-float Xl[NUM_OF_ELEMENTS] = {71.613,71.613,71.613,71.613,71.613,71.613,71.613,71.613,71.613,71.613,
-                              71.613,71.613,71.613,71.613,71.613,71.613,71.613,71.613,71.613,71.613,
-                              71.613,71.613,71.613,71.613,71.613,71.613,71.613,71.613,71.613,71.613,
-                              71.613,71.613,71.613,71.613,71.613,71.613,71.613,71.613,71.613,71.613,
-                              71.613,71.613,71.613,71.613,71.613,71.613,71.613,71.613,71.613,71.613,
-                              71.613,71.613},
-
-       Xu[NUM_OF_ELEMENTS] = {21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,
-                              21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,
-                              21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,
-                              21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,
-                              21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,21612.860,
-                              21612.860,21612.860};
-#endif
-
-#if 0
-const float standard_A[64] = {0.111, 0.141, 0.196, 0.25, 0.307, 0.391, 0.442, 0.563, 0.602, 0.766,
-                      0.785, 0.994, 1.00, 1.228, 1.266, 1.457, 1.563,
-                      1.62, 1.80, 1.99, 2.13, 2.38, 2.62, 2.63, 2.88, 2.93, 3.09, 3.13, 3.38,
-                      3.47, 3.55, 3.63, 3.84, 3.87, 3.88, 4.18, 4.22, 4.49, 4.59, 4.80, 4.97,
-                      5.12, 5.74, 7.22, 7.97, 8.53, 9.3, 10.85, 11.50, 13.50, 13.90, 14.20, 15.50, 16.00, 16.90,
-                      18.80, 19.90, 22.00, 22.90, 24.5, 26.50, 28.0, 30.00, 33.50}; //Standard cross-sectional areas for design variable in^2
-
-float Xl[NUM_OF_ELEMENTS] = {0.111,0.111,0.111,0.111,0.111,0.111,0.111,0.111,0.111,0.111,
-                              0.111,0.111,0.111,0.111,0.111,0.111,0.111,0.111,0.111,0.111,
-                              0.111,0.111,0.111,0.111,0.111,0.111,0.111,0.111,0.111,0.111,
-                              0.111,0.111,0.111,0.111,0.111,0.111,0.111,0.111,0.111,0.111,
-                              0.111,0.111,0.111,0.111,0.111,0.111,0.111,0.111,0.111,0.111,
-                              0.111,0.111},
-
-       Xu[NUM_OF_ELEMENTS] = {33.50,33.50,33.50,33.50,33.50,33.50,33.50,33.50,33.50,33.50,
-                              33.50,33.50,33.50,33.50,33.50,33.50,33.50,33.50,33.50,33.50,
-                              33.50,33.50,33.50,33.50,33.50,33.50,33.50,33.50,33.50,33.50,
-                              33.50,33.50,33.50,33.50,33.50,33.50,33.50,33.50,33.50,33.50,
-                              33.50,33.50,33.50,33.50,33.50,33.50,33.50,33.50,33.50,33.50,
-                              33.50,33.50};
-#endif
-
-//const int D = 12;
 
 __host__ __device__ static void getTransposeOfTe1D(Matrix1DT* inputMat, Matrix1DT* outputMat)
 {
@@ -130,39 +79,39 @@ __host__ __device__ float function(const float * __restrict A, const int D)
                                          10, 10, 10, 10,
                                          11, 11, 11, 11, 11, 11,
                                          12, 12, 12 };
-/*
-    const float standard_A[64] = {0.111, 0.141, 0.196, 0.25, 0.307, 0.391, 0.442, 0.563, 0.602, 0.766,
-                      0.785, 0.994, 1.00, 1.228, 1.266, 1.457, 1.563,
-                      1.62, 1.80, 1.99, 2.13, 2.38, 2.62, 2.63, 2.88, 2.93, 3.09, 3.13, 3.38,
-                      3.47, 3.55, 3.63, 3.84, 3.87, 3.88, 4.18, 4.22, 4.49, 4.59, 4.80, 4.97,
-                      5.12, 5.74, 7.22, 7.97, 8.53, 9.3, 10.85, 11.50, 13.50, 13.90, 14.20, 15.50, 16.00, 16.90,
-                      18.80, 19.90, 22.00, 22.90, 24.5, 26.50, 28.0, 30.00, 33.50}; //Standard cross-sectional areas for design variable in^2*/
-/*
-    const double standard_A_mm[64] = {71.613, 90.968, 126.451, 161.29, 198.064, 252.258, 285.161,363.225, 388.386, 494.193,
-                               506.451, 641.289, 645.16, 792.256, 816.773, 939.998, 1008.385,
-                               1045.159, 1161.288, 1283.868, 1374.191, 1535.481, 1690.319, 1696.771, 1858.061,
-                               1890.319, 1993.544, 2019.351, 2180.641, 2238.705, 2290.318, 2341.931, 2477.414,
-                               2496.769, 2503.221, 2696.769, 2722.575, 2896.768, 2961.284, 3096.768, 3206.445,
-                               3303.219, 3703.218, 4658.055, 5141.925, 5503.215, 5999.988, 6999.986, 7419.340, 8709.660, 8967.724, 9161.272,
-                               9999.980, 10322.560, 10903.204, 12129.008, 12838.684, 14193.520, 14774.164, 15806.420, 17096.740, 18064.480, 19354.800, 21612.860};*/
 
-    //allocateMatrix1D(&K, TOTAL_DOF, TOTAL_DOF);
-    K.rows = K.cols = TOTAL_DOF; K.isInit = 1;
-    //allocateMatrix1D(&F, TOTAL_DOF, 1);
-    F.rows = TOTAL_DOF; F.cols = 1; F.isInit = 1;
-    //allocateMatrix1D(&Te, 2, 4);
-    Te.rows = 2; Te.cols = 4; Te.isInit = 1;
-    //allocateMatrix1D(&Te_Transpose, 4, 2);
-    Te_Transpose.rows = 4; Te_Transpose.cols = 2; Te_Transpose.isInit = 1;
-    //allocateMatrix1D(&ke2x2, 2, 2);
-    ke2x2.rows = 2; ke2x2.cols = 2; ke2x2.isInit = 1;
-    //allocateMatrix1D(&matrix2x2_Precomputed, 2, 2);
-    matrix2x2_Precomputed.rows = 2; matrix2x2_Precomputed.cols = 2; matrix2x2_Precomputed.isInit = 1;
-    //allocateMatrix1D(&Be, 1, 2);
-    Be.rows = 1; Be.cols = 2; Be.isInit = 1;
-    //allocateMatrix1D(&disp_e, 4, 1);
-    disp_e.rows = 4; disp_e.cols = 1; disp_e.isInit = 1;
+    /*************************************************************************************************/
+    float K_array[TOTAL_DOF*TOTAL_DOF];
+    allocateMatrix1D(&K, K_array, TOTAL_DOF, TOTAL_DOF);
 
+    float F_array[TOTAL_DOF];
+    allocateMatrix1D(&F, F_array, TOTAL_DOF, 1);
+
+    float Te_array[8]; //rows * cols
+    allocateMatrix1D(&Te, Te_array, 2, 4);
+
+    float Te_Transpose_array[8]; //rows * cols
+    allocateMatrix1D(&Te_Transpose, Te_Transpose_array, 4, 2);
+
+
+    float ke2x2_array[4]; //rows * cols
+    allocateMatrix1D(&ke2x2, ke2x2_array, 2, 2);
+
+    float matrix2x2_Precomputed_array[4];
+    allocateMatrix1D(&matrix2x2_Precomputed, matrix2x2_Precomputed_array, 2, 2);
+
+    float Be_array[2];
+    allocateMatrix1D(&Be, Be_array, 1, 2);
+
+    float disp_e_array[4];
+    allocateMatrix1D(&disp_e, disp_e_array, 4, 1);
+    /*************************************************************************************************/
+    float output4x2_array[8];
+    float output4x4_array[16];
+    float invK_array[MAX_ROWS*MAX_COLS];
+    float U_array[MAX_ROWS];
+    float de_o_array[MAX_ROWS];
+    float productOfBe_de_array[MAX_ROWS];
     initMatrix(&output4x2);
     initMatrix(&output4x4);
     initMatrix(&invK);
@@ -206,10 +155,10 @@ __host__ __device__ float function(const float * __restrict A, const int D)
 
         // Compute stiffness martix of element line 56
       
-        multiplyScalarMatrix1D((Ae[i]*E/le), &matrix2x2_Precomputed, &ke2x2);
+        multiplyScalarMatrix1D((Ae[i]*E/le), &matrix2x2_Precomputed, ke2x2_array, &ke2x2);
         getTransposeOfTe1D(&Te, &Te_Transpose);
-        multiplyMatrices1D(&Te_Transpose, &ke2x2, &output4x2); //line 59
-        multiplyMatrices1D(&output4x2, &Te, &output4x4);
+        multiplyMatrices1D(&Te_Transpose, &ke2x2, output4x2_array, &output4x2); //line 59
+        multiplyMatrices1D(&output4x2, &Te, output4x4_array, &output4x4);
 
         //Find index assemble
         index[0] = 2*element1D[i * 2] - 1 - 1;
@@ -244,8 +193,8 @@ __host__ __device__ float function(const float * __restrict A, const int D)
     }
 
     //Calculate U = K\F. inv(K)*F
-    LU_getInverseMatrix1D(&K, &invK);
-    multiplyMatrices1D(&invK, &F, &U); //U is nodal displacement of each element //Pass U
+    LU_getInverseMatrix1D(&K, invK_array, &invK);
+    multiplyMatrices1D(&invK, &F, U_array, &U); //U is nodal displacement of each element //Pass U
 
     /* Compute stress for each element */
     for (int i = 0; i < NUM_OF_ELEMENTS; i++)
@@ -279,11 +228,11 @@ __host__ __device__ float function(const float * __restrict A, const int D)
         disp_e.pMatrix[2 * disp_e.cols] = U.pMatrix[index[2] * U.cols];
         disp_e.pMatrix[3 * disp_e.cols] = U.pMatrix[index[3] * U.cols];
 
-        multiplyMatrices1D(&Te, &disp_e, &de_o);
+        multiplyMatrices1D(&Te, &disp_e, de_o_array, &de_o);
         //compute stress of element
-        multiplyMatrices1D(&Be, &de_o, &productOfBe_de);
-
-        multiplyScalarMatrix1D(E, &productOfBe_de, &temp); //1x1
+        multiplyMatrices1D(&Be, &de_o, productOfBe_de_array, &productOfBe_de);
+        float temp_array[1];
+        multiplyScalarMatrix1D(E, &productOfBe_de, temp_array, &temp); //1x1
         stress_e[i] = temp.pMatrix[0];
     }
 
@@ -350,21 +299,6 @@ __host__ __device__ float function(const float * __restrict A, const int D)
         sum4 = sum4 + (Ae[49+i] * rho * 2.0);
     }
     sum = sum1 +sum2+sum3+sum4;
-    /* Deallocate */
-    //deallocateMatrix1D(&temp);
-    //deallocateMatrix1D(&Te);
-    //deallocateMatrix1D(&Te_Transpose);
-    //deallocateMatrix1D(&invK);
-    //deallocateMatrix1D(&F);
-    //deallocateMatrix1D(&ke2x2);
-    //deallocateMatrix1D(&Be);
-    //deallocateMatrix1D(&U);
-    //deallocateMatrix1D(&disp_e);
-    //deallocateMatrix1D(&de_o);
-    //deallocateMatrix1D(&productOfBe_de);
-    //deallocateMatrix1D(&matrix2x2_Precomputed);
-    //deallocateMatrix1D(&output4x2);
-    //deallocateMatrix1D(&output4x4);
 
     return (sum * pow((sumOfCtress + sumOfCdisp + 1), 1));
 }
