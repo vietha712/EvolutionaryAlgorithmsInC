@@ -17,7 +17,7 @@
 /* Random number generator defined by URAND should return
    double-precision floating-point values uniformly distributed
    over the interval [0.0, 1.0)					*/
-#define MAX_DIMENSION 20
+#define MAX_DIMENSION 29
 #define URAND	((double)rand()/((double)RAND_MAX + 1.0))
 
 #define FRAND  (((double)rand()/(double)RAND_MAX) * 0.6 + 0.4) // [0.4 to 1]

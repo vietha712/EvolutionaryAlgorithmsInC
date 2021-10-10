@@ -1,1 +1,1 @@
-nvcc --relocatable-device-code true -o coevo coevolution_de.cu TimingGPU.cu Utilities.cu matrix_improved.cu planar_truss_52bars_improved.cu
+nvcc --relocatable-device-code true -o coevo coevolution_de.cu TimingGPU.cu Utilities.cu matrix_improved.cu planar_truss_72bars.cu

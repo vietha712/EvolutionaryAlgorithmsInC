@@ -91,8 +91,6 @@ double findMaxMemInArray(double *array, int length)
     return max;
 }
 
-const double epsilon_1 = 1.0;
-double epsilon_2 = 20.0;
 int E = 10000000; //N/m2
 int P = 100000;
 const int D = 10;
@@ -271,7 +269,7 @@ double func(double *A)
         }
         else
         {
-            Cdisp[i] = fabs(((U.pMatrix[i][0] - maxDisp)/maxDisp));
+            Cdisp[i] = fabs(((U.pMatrix[i][0] - maxDisp)/maxDisp)); //Heuristic dragonfly algorithm 
             //Cdisp[i] = U.pMatrix[i][0]; //aeDE paper
         }
         sumOfCdisp += Cdisp[i];

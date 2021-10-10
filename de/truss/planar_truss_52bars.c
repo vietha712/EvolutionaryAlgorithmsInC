@@ -196,6 +196,7 @@ double func(double *A)
     for (int i = 0; i < NUM_OF_ELEMENTS; i++)
     {
         Ae[i] = meterSquare_A[indexA[i] - 1];
+        printf("Ae[%d] A[%d] = %f\n", i,indexA[i], Ae[i]);
     }
 
     /* Compute stiffness matrix */
