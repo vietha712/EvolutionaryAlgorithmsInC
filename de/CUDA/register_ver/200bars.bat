@@ -1,0 +1,1 @@
+nvcc -rdc=true -o 200bars_coevo coevo_reg.cu TimingGPU.cu Utilities.cu matrix_improved.cu planar_truss_200bars.cu

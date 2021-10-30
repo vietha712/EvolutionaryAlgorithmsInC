@@ -23,7 +23,7 @@ __host__ __device__ static void getTransposeOfTe1D(Matrix1DT* inputMat, Matrix1D
 }
 #define BCDOF 4
 #define LOAD_CASE_2
-__host__ __device__ float function(const float * __restrict A, const int D, float * d_invK, float * d_localLU, float * d_s)
+__host__ __device__ float functional(const float * __restrict A, const int D, float * d_invK, float * d_localLU, float * d_s)
 {
     float sum = 0.0f;
     int x[2], y[2];
@@ -119,7 +119,6 @@ __host__ __device__ float function(const float * __restrict A, const int D, floa
     /*************************************************************************************************/
     float output4x2_array[8];
     float output4x4_array[16];
-    //float invK_array[TOTAL_DOF*TOTAL_DOF];
     float U_array[TOTAL_DOF];
     float de_o_array[500];
     float productOfBe_de_array[500];

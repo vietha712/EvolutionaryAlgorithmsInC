@@ -569,7 +569,7 @@ void constructElitistPop(const int inputSize,
 int main()
 {
 	// --- Number of individuals in the population (Np >=4 for mutation purposes)
-	int			Np = 300;
+	int			Np = 600;
 	// --- Number of individuals in the sub population (Np >=4 for mutation purposes)
 	int			subPopSize = Np/3;
 	// --- Number of individuals in the sub population to migrate
