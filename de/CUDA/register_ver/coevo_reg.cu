@@ -13,7 +13,9 @@ using namespace thrust;
 #include <time.h>
 #include <fstream>
 
-#define TRUSS_72BARS_PROBLEM
+#define TRUSS_10BARS_PROBLEM
+#define ITERATION 200
+#define NOP 900
 
 #include "Utilities.cuh"
 #include "TimingGPU.cuh"
@@ -35,11 +37,11 @@ using namespace thrust;
 #endif //#ifdef TRUSS_72BARS_PROBLEM
 #define pi 3.14159265358979f
 
-#define BLOCK_SIZE_POP		(16 )
-#define BLOCK_SIZE_RAND1	(32 )
-#define BLOCK_SIZE_RAND2	(32 )
+#define BLOCK_SIZE_POP		(32 )
+#define BLOCK_SIZE_RAND1	(64 )
+#define BLOCK_SIZE_RAND2	(64 )
 #define BLOCK_SIZE_UNKN		(OP_DIMENSION	)
-#define BLOCK_SIZE			(128)
+#define BLOCK_SIZE			(256)
 
 #define PI_f				3.14159265358979f
 
@@ -50,18 +52,6 @@ using namespace thrust;
 #define DEBUG
 
 //#define ANTENNAS
-
-// --- REFERENCES
-//     [1] R. Storn and K. Price, “Differential evolution – a simple and efficient heuristic for global optimization over continuous spaces,” 
-//     Journal of Global Optimization, vol. 11, no. 4, pp. 341–359, 1997
-
-//     [2] Lucas de P. Veronese and Renato A. Krohling, “Differential Evolution Algorithm on the GPU with C-CUDA,” 
-//     Proc. of the IEEE Congress on Evolutionary Computation, Barcelona, Spain, Jul. 18-23, 2010, pp. 1-7.
-
-// Conventions: the index j addresses the population member while the index i addresses the member component
-//              the homologous host and device variables have the same name with a "h_" or "d_" prefix, respectively
-//				the __host__ and __device__ functions pointer parameters have the same name for comparison purposes. it is up to the caller to use 
-//				host or device pointers, as appropriate
 
 /****************************************/
 /* EVALUATION OF THE OBJECTIVE FUNCTION */
@@ -241,7 +231,6 @@ __global__ void evaluation_GPU(const int Np,
 									  &d_s[j*TOTAL_DOF*TOTAL_DOF]);
 }
 
-#ifdef REGISTER_VERSION
 __global__ void generation_new_population_mutation_crossover_selection_evaluation_GPU_rand_1(
     float * __restrict__ pop, const int Np, const int D,
 	float * __restrict__ npop, const float F, const float CR,
@@ -274,8 +263,6 @@ __global__ void generation_new_population_mutation_crossover_selection_evaluatio
 		// --- Generate new population
 
 		// --- Mutation and crossover
-		//if (Rand < CR)	for (int i = 0; i<D; i++) npop[j*D + i] = pop[a*D + i] + F*(pop[b*D + i] - pop[c*D + i]);
-		//else			for (int i = 0; i<D; i++) npop[j*D + i] = pop[j*D + i];
 		for (int i = 0; i<D; i++) {
 			// --- Crossover values
 			Rand = curand_uniform(&state[j]);
@@ -331,19 +318,12 @@ __global__ void generation_new_population_mutation_crossover_selection_evaluatio
 		do d = Np*(curand_uniform(&state[j]));	while (d == j || d == c || d == b || d == a);
 		do e = Np*(curand_uniform(&state[j]));	while (e == j || e == d || e == c || e == b || e == a);
 
-		//// --- Crossover values
-		//Rand = curand_uniform(&state[j]);
-
 		// --- Generate new population
 
 		// --- Mutation and crossover
-		//if (Rand < CR)	for (int i = 0; i<D; i++) npop[j*D + i] = pop[a*D + i] + F*(pop[b*D + i] - pop[c*D + i]);
-		//else			for (int i = 0; i<D; i++) npop[j*D + i] = pop[j*D + i];
 		for (int i = 0; i < D; i++) {
 			// --- Crossover values
 			Rand = curand_uniform(&state[j]);
-			//if (Rand < CR) npop[j*D + i] = pop[a*D + i] + F*(pop[b*D + i] - pop[c*D + i]);
-			//else           npop[j*D + i] = pop[j*D + i];
     		if (Rand < CR)	npop[j*D + i] = pop[e*D+i] + F*(pop[a*D+i]+pop[b*D+i] - pop[c*D+i]-pop[d*D+i]);
 		    else			npop[j*D + i] = pop[j*D + i];
 		}
@@ -396,19 +376,13 @@ __global__ void generation_new_population_mutation_crossover_selection_evaluatio
 		do c = Np*(curand_uniform(&state[j]));	while (c == j || c == a || b == a);
 		do d = Np*(curand_uniform(&state[j]));	while (d == j || d == c || d == b || d == a);
 
-		//// --- Crossover values
-		//Rand = curand_uniform(&state[j]);
 
 		// --- Generate new population
 
 		// --- Mutation and crossover
-		//if (Rand < CR)	for (int i = 0; i<D; i++) npop[j*D + i] = pop[a*D + i] + F*(pop[b*D + i] - pop[c*D + i]);
-		//else			for (int i = 0; i<D; i++) npop[j*D + i] = pop[j*D + i];
 		for (int i = 0; i < D; i++) {
 			// --- Crossover values
 			Rand = curand_uniform(&state[j]);
-			//if (Rand < CR) npop[j*D + i] = pop[a*D + i] + F*(pop[b*D + i] - pop[c*D + i]);
-			//else           npop[j*D + i] = pop[j*D + i];
     		if (Rand < CR)	npop[j*D+i] = pop[best_old_gen_ind*D+i] + F*(pop[a*D+i]-pop[b*D+i]) + F*(pop[c*D+i]-pop[d*D+i]);
 		    else			npop[j*D + i] = pop[j*D + i];
 		}
@@ -433,7 +407,6 @@ __global__ void generation_new_population_mutation_crossover_selection_evaluatio
 
 	}
 }
-#endif
 
 /***********************/
 /* FIND MINIMUM ON GPU */
@@ -509,17 +482,24 @@ void extractElitistPop(const int popSize,
 int main()
 {
 	// --- Number of individuals in the population (Np >=4 for mutation purposes)
-	int			Np = 600;
+	int			Np = NOP;
 	// --- Number of individuals in the sub population (Np >=4 for mutation purposes)
 	int			subPopSize = Np/3;
 	// --- Number of individuals in the sub population to migrate
-	int			numOfMigratePop = subPopSize/5;
+	int			numOfMigratePop = subPopSize/10;
 	// --- Dimensionality of each individual (number of unknowns)
 	int			D = OP_DIMENSION;
 
     // --- the rate to perform elitist strategy
 	int		    updateRate = 10; // --- Need to be tune depend on Gmax. Tradeoff with performance
-
+#if defined(TRUSS_10BARS_PROBLEM)
+	float		F = 0.6f, F2 = 0.3f, F3 = 0.4f;
+	// --- Maximum number of generations
+	int			Gmax = ITERATION;
+	// --- Crossover constant (0 < CR <= 1)
+	float		CR = 0.7f, CR2 = 0.3f, CR3 = 0.2f;
+	//int *d_best_index;			// --- Device side current optimal member index
+#endif
 #if defined(TRUSS_72BARS_PROBLEM)
 	float		F = 0.6f, F2 = 0.3f, F3 = 0.4f;
 	// --- Maximum number of generations
@@ -529,17 +509,23 @@ int main()
 	//int *d_best_index;			// --- Device side current optimal member index
 #endif
 #if defined(TRUSS_200BARS_PROBLEM)
-	float		F = 0.8f, F2 = 0.6f, F3 = 0.4f;
+	float		F = 0.8f, F2 = 0.5f, F3 = 0.4f;
 	// --- Maximum number of generations
 	int			Gmax = 200;
 	// --- Crossover constant (0 < CR <= 1)
-	float		CR = 0.9f, CR2 = 0.8f, CR3 = 0.2f;
+	float		CR = 0.9f, CR2 = 0.3f, CR3 = 0.2f;
 	//int *d_best_index;			// --- Device side current optimal member index
+#endif
+#if defined(TRUSS_52BARS_PROBLEM)
+	float		F = 0.7f, F2 = 0.2f, F3 = 0.4f;
+	// --- Maximum number of generations
+	int			Gmax = 200;
+	// --- Crossover constant (0 < CR <= 1)
+	float		CR = 0.9f, CR2 = 0.8f, CR3 = 0.8f;
 #endif
 
 	// --- Mutually different random integer indices selected from {1, 2, … ,Np}
 	int *h_best_index_dev;		// --- Host side current optimal member index of device side
-	//int *d_best_index;			// --- Device side current optimal member index
 
 	float *d_subPop_1,				// --- Device side sub-population 1
 	  	  *d_subPop_2,				// --- Device side sub-population 2
@@ -586,7 +572,7 @@ int main()
 		    *h_maxima,				// --- Host side maximum constraints vector
 		    *h_minima,
 		    *h_testBufferObj,
-		    *h_testBufferPop;		// --- Host side minimum constraints vector
+		    *h_testBufferPop;
 	int	  *h_best_index_dev_1, *h_best_index_dev_2, *h_best_index_dev_3;
     curandState *devState_1;		// --- Device side random generator state vector
     curandState *devState_2;		// --- Device side random generator state vector
@@ -779,32 +765,39 @@ int main()
 		gpuErrchk(cudaPeekAtLastError());
 		gpuErrchk(cudaDeviceSynchronize());
 #endif
-#ifdef TRACKING_EVO
-		find_minimum_GPU(subPopSize, d_fobj_1, &h_best_dev_1[i], &h_best_index_dev_1[i]);
-		find_minimum_GPU(subPopSize, d_fobj_2, &h_best_dev_2[i], &h_best_index_dev_2[i]);
-		find_minimum_GPU(subPopSize, d_fobj_3, &h_best_dev_3[i], &h_best_index_dev_3[i]);
+
+		//find_minimum_GPU(subPopSize, d_fobj_1, &h_best_dev_1[i], &h_best_index_dev_1[i]);
+		//find_minimum_GPU(subPopSize, d_fobj_2, &h_best_dev_2[i], &h_best_index_dev_2[i]);
+		//find_minimum_GPU(subPopSize, d_fobj_3, &h_best_dev_3[i], &h_best_index_dev_3[i]);
 		//printf("aaaa = %f\n", h_best_dev[i]);
 
 #ifdef TIMING
-		printf("Iteration: %i; best member value: %f - %f - %f: best member index: %i - %i - %i\n", i, h_best_dev_1[i], h_best_dev_2[i], h_best_dev_3[i], h_best_index_dev_1[i], h_best_index_dev_2[i], h_best_index_dev_3[i]);
+		//printf("Iteration: %i; best member value: %f - %f - %f: best member index: %i - %i - %i\n", i, h_best_dev_1[i], h_best_dev_2[i], h_best_dev_3[i], h_best_index_dev_1[i], h_best_index_dev_2[i], h_best_index_dev_3[i]);
 #endif
-#endif
+
 	}
 #ifdef TIMING
 	printf("Total timing = %f [s]\n", timerGPU.GetCounter() * 0.001);
-#endif TIMING
-    
+#endif// TIMING
     find_minimum_GPU(subPopSize, d_fobj_1, &h_best_dev_1[Gmax - 1], &h_best_index_dev_1[Gmax - 1]);
 	find_minimum_GPU(subPopSize, d_fobj_2, &h_best_dev_2[Gmax - 1], &h_best_index_dev_2[Gmax - 1]);
 	find_minimum_GPU(subPopSize, d_fobj_3, &h_best_dev_3[Gmax - 1], &h_best_index_dev_3[Gmax - 1]);
-	
     gpuErrchk(cudaMemcpy(h_pop_dev_res_1, d_subPop_1, D*subPopSize*sizeof(float), cudaMemcpyDeviceToHost));
     gpuErrchk(cudaMemcpy(h_pop_dev_res_2, d_subPop_2, D*subPopSize*sizeof(float), cudaMemcpyDeviceToHost));
     gpuErrchk(cudaMemcpy(h_pop_dev_res_3, d_subPop_3, D*subPopSize*sizeof(float), cudaMemcpyDeviceToHost));
-	for (int i = 0; i<D; i++) printf("Variable nr. %i = %.4f\n", i, h_pop_dev_res_3[(Gmax-1) * D + i]);
-	printf("Objective value of 3: = %.4f\n", h_best_dev_3[Gmax - 1]);
-    printf("Objective value of 2: = %.4f\n", h_best_dev_2[Gmax - 1]);
-    printf("Objective value of 1: = %.4f\n", h_best_dev_1[Gmax - 1]);
 
+	printf("Obj = %.3f - Obj = %.3f - Obj = %.3f\n", h_best_dev_1[Gmax - 1], h_best_dev_2[Gmax - 1], h_best_dev_3[Gmax - 1]);
+	for(int x = 0; x < D; x++)
+	{
+		printf("var[%d] = %.3f\n", x, h_pop_dev_res_1[h_best_index_dev_1[Gmax - 1]*D + x]);
+	}
+	for(int x = 0; x < D; x++)
+	{
+		printf("var[%d] = %.3f\n", x, h_pop_dev_res_2[h_best_index_dev_2[Gmax - 1]*D + x]);
+	}
+	for(int x = 0; x < D; x++)
+	{
+		printf("var[%d] = %.3f\n", x, h_pop_dev_res_3[h_best_index_dev_3[Gmax - 1]*D + x]);
+	}
 	return 0;
 }

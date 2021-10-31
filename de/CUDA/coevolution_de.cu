@@ -544,25 +544,6 @@ void extractElitistPop(const int popSize,
 	}
 }
 
-/**************************/
-/* Construct elitist Pop  */
-/**************************/
-/*
-void constructElitistPop(const int inputSize, 
-					 	 const int D,
-					 	 const int outputSize,
-					 	 float * __restrict pElitistObj_1,
-					 	 float * __restrict pElitistPop_1,
-					 	 float * __restrict pElitistObj_2,
-					 	 float * __restrict pElitistPop_2,
-					 	 float * __restrict pElitistObj_3,
-					 	 float * __restrict pElitistPop_3,
-					 	 float * __restrict pFinalObj,
-					 	 float * __restrict pFinalPop) 
-{
-
-}*/
-
 /********/
 /* MAIN */
 /********/

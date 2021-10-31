@@ -78,7 +78,7 @@ __host__ __device__ static void LU1D(Matrix1DT *matrix, int n)
     } 
 }
 
-__host__ __device__ void LU_getInverseMatrix1D(Matrix1DT *inputMat, float outputArray[], Matrix1DT *outInvMat)
+__host__ __device__ void LU_getInverseMatrix1D(Matrix1DT *inputMat, float outputArray[], Matrix1DT *outInvMat, float *localLUArray, float *sArray)
 {
     Matrix1DT localLU, s;
     int i, j;
@@ -92,11 +92,9 @@ __host__ __device__ void LU_getInverseMatrix1D(Matrix1DT *inputMat, float output
 
     int localDim = inputMat->rows - 1;
 
-    float localLU_array[MAX_ROWS*MAX_COLS];
-    allocateMatrix1D(&localLU, localLU_array, inputMat->rows, inputMat->cols); 
+    allocateMatrix1D(&localLU, localLUArray, inputMat->rows, inputMat->cols); 
     //localLU.rows = inputMat->rows; localLU.cols = inputMat->cols; localLU.isInit = 1;
-    float s_array[MAX_ROWS*MAX_COLS];
-    allocateMatrix1D(&s, s_array, inputMat->rows, inputMat->cols);
+    allocateMatrix1D(&s, sArray, inputMat->rows, inputMat->cols);
     //s.rows = inputMat->rows; s.cols = inputMat->cols; s.isInit = 1;
 
     float d[MAX_ROWS], y[MAX_ROWS];

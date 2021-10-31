@@ -8,7 +8,6 @@
 #define NUM_OF_ELEMENTS 52
 #define NUM_OF_NODES 20
 #define DOF 2
-#define TOTAL_DOF 40
 
 __host__ __device__ static void getTransposeOfTe1D(Matrix1DT* inputMat, Matrix1DT* outputMat);
 
@@ -93,7 +92,6 @@ __host__ __device__ float functional(const float * __restrict A, const int D, fl
     float Te_Transpose_array[8]; //rows * cols
     allocateMatrix1D(&Te_Transpose, Te_Transpose_array, 4, 2);
 
-
     float ke2x2_array[4]; //rows * cols
     allocateMatrix1D(&ke2x2, ke2x2_array, 2, 2);
 
@@ -108,7 +106,7 @@ __host__ __device__ float functional(const float * __restrict A, const int D, fl
     /*************************************************************************************************/
     float output4x2_array[8];
     float output4x4_array[16];
-    float invK_array[MAX_ROWS*MAX_COLS];
+    //float invK_array[MAX_ROWS*MAX_COLS];
     float U_array[MAX_ROWS];
     float de_o_array[MAX_ROWS];
     float productOfBe_de_array[MAX_ROWS];
@@ -193,7 +191,7 @@ __host__ __device__ float functional(const float * __restrict A, const int D, fl
     }
 
     //Calculate U = K\F. inv(K)*F
-    LU_getInverseMatrix1D(&K, invK_array, &invK);
+    LU_getInverseMatrix1D(&K, d_invK, &invK, d_localLU, d_s);
     multiplyMatrices1D(&invK, &F, U_array, &U); //U is nodal displacement of each element //Pass U
 
     /* Compute stress for each element */
