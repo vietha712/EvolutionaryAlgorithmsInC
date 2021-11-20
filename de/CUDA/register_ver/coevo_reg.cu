@@ -13,9 +13,9 @@ using namespace thrust;
 #include <time.h>
 #include <fstream>
 
-#define TRUSS_10BARS_PROBLEM
+#define TRUSS_72BARS_PROBLEM
 #define ITERATION 200
-#define NOP 900
+#define NOP 600
 
 #include "Utilities.cuh"
 #include "TimingGPU.cuh"
@@ -32,26 +32,25 @@ using namespace thrust;
 #define OP_DIMENSION 29
 #endif
 #ifdef TRUSS_72BARS_PROBLEM
-#include "planar_truss_72bars.cuh"
+#include "spatial_truss_72bars.cuh"
 #define OP_DIMENSION 16
 #endif //#ifdef TRUSS_72BARS_PROBLEM
+#ifdef TRUSS_160BARS_PROBLEM
+#include "spatial_truss_160bars.cuh"
+#define OP_DIMENSION 38
+#endif //#ifdef TRUSS_160BARS_PROBLEM
 #define pi 3.14159265358979f
 
-#define BLOCK_SIZE_POP		(32 )
-#define BLOCK_SIZE_RAND1	(64 )
-#define BLOCK_SIZE_RAND2	(64 )
+#define BLOCK_SIZE_POP		(16 )
+#define BLOCK_SIZE_RAND1	(32 )
+#define BLOCK_SIZE_RAND2	(32 )
 #define BLOCK_SIZE_UNKN		(OP_DIMENSION	)
-#define BLOCK_SIZE			(256)
+#define BLOCK_SIZE			(128)
 
 #define PI_f				3.14159265358979f
 
 #define TIMING
-//#define SHARED_VERSION
-#define REGISTER_VERSION
-
 #define DEBUG
-
-//#define ANTENNAS
 
 /****************************************/
 /* EVALUATION OF THE OBJECTIVE FUNCTION */
@@ -210,6 +209,39 @@ const static float standard_A[64] = {0.111, 0.141, 0.196, 0.25, 0.307, 0.391, 0.
     }
 }
 #endif //#ifdef TRUSS_72BARS_PROBLEM
+#ifdef TRUSS_160BARS_PROBLEM
+#define MAXIMA 94.13f
+#define MINIMA 1.84f
+
+__host__ __device__ void fix(float* __restrict X, const int D)
+{
+// in cm2
+const static float standard_A[42] = {1.84, 2.26, 2.66, 3.07, 3.47, 3.88, 4.79, 5.27, 5.75, 6.25, 6.84, 7.44,
+									 8.06, 8.66, 9.40, 10.47, 11.38, 12.21, 13.79, 15.39, 17.03, 19.03, 21.12,
+									 23.20, 25.12, 27.50, 29.88, 32.76, 33.90, 34.77, 39.16, 43.00, 45.65, 46.94,
+									 51.00, 52.10, 61.82, 61.90, 68.30, 76.38, 90.60, 94.13}; //Standard cross-sectional areas for design variable cm^2
+
+	float temp1, temp2;
+
+    for (int i = 0; i < D; i++)
+    {
+        for (int j = 0; j < 42; j++)
+        {
+            if ((X[i] > standard_A[j]))
+            {
+                continue;
+            }
+            else
+            {
+                temp1 = X[i] - standard_A[j];
+                temp2 = X[i] - standard_A[j - 1];
+                X[i] = (fabs(temp1) <= fabs(temp2)) ? standard_A[j] : standard_A[j - 1];
+                break;
+            }
+        }
+    }
+}
+#endif //#ifdef TRUSS_160BARS_PROBLEM
 
 /********************************/
 /* POPULATION EVALUATION ON GPU */
@@ -231,7 +263,7 @@ __global__ void evaluation_GPU(const int Np,
 									  &d_s[j*TOTAL_DOF*TOTAL_DOF]);
 }
 
-__global__ void generation_new_population_mutation_crossover_selection_evaluation_GPU_rand_1(
+__global__ void generation_new_population_mutation_crossover_selection_evaluation_GPU_current_to_best(
     float * __restrict__ pop, const int Np, const int D,
 	float * __restrict__ npop, const float F, const float CR,
 	const float * __restrict__ minimum, float * __restrict__ maximum,
@@ -503,25 +535,32 @@ int main()
 #if defined(TRUSS_72BARS_PROBLEM)
 	float		F = 0.6f, F2 = 0.3f, F3 = 0.4f;
 	// --- Maximum number of generations
-	int			Gmax = 200;
+	int			Gmax = ITERATION;
 	// --- Crossover constant (0 < CR <= 1)
 	float		CR = 0.7f, CR2 = 0.3f, CR3 = 0.2f;
 	//int *d_best_index;			// --- Device side current optimal member index
 #endif
 #if defined(TRUSS_200BARS_PROBLEM)
-	float		F = 0.8f, F2 = 0.5f, F3 = 0.4f;
+	float		F = 0.4f, F2 = 0.1f, F3 = 0.4f;
 	// --- Maximum number of generations
-	int			Gmax = 200;
+	int			Gmax = ITERATION;
 	// --- Crossover constant (0 < CR <= 1)
-	float		CR = 0.9f, CR2 = 0.3f, CR3 = 0.2f;
+	float		CR = 1.0f, CR2 = 0.3f, CR3 = 0.2f;
 	//int *d_best_index;			// --- Device side current optimal member index
 #endif
 #if defined(TRUSS_52BARS_PROBLEM)
 	float		F = 0.7f, F2 = 0.2f, F3 = 0.4f;
 	// --- Maximum number of generations
-	int			Gmax = 200;
+	int			Gmax = ITERATION;
 	// --- Crossover constant (0 < CR <= 1)
 	float		CR = 0.9f, CR2 = 0.8f, CR3 = 0.8f;
+#endif
+#if defined(TRUSS_160BARS_PROBLEM)
+	float		F = 0.45f, F2 = 0.1f, F3 = 0.2f;
+	// --- Maximum number of generations
+	int			Gmax = ITERATION;
+	// --- Crossover constant (0 < CR <= 1)
+	float		CR = 0.9f, CR2 = 0.3f, CR3 = 0.2f;
 #endif
 
 	// --- Mutually different random integer indices selected from {1, 2, … ,Np}
@@ -694,8 +733,6 @@ int main()
 	evaluation_GPU <<<iDivUp(subPopSize, BLOCK_SIZE), BLOCK_SIZE >>>(subPopSize, D, d_subPop_2, d_fobj_2, d_invK_2, d_localLU_2, d_s_2);
 	evaluation_GPU <<<iDivUp(subPopSize, BLOCK_SIZE), BLOCK_SIZE >>>(subPopSize, D, d_subPop_3, d_fobj_3, d_invK_3, d_localLU_3, d_s_3);
 
-	printf("Grid size line 802 <<<%d, %d>>>\n", iDivUp(Np, BLOCK_SIZE), BLOCK_SIZE);
-
 #ifdef DEBUG
 	gpuErrchk(cudaPeekAtLastError());
 	gpuErrchk(cudaDeviceSynchronize());
@@ -704,14 +741,14 @@ int main()
     int bestIndex_3 = 0;
 	TimingGPU timerGPU;
 	timerGPU.StartCounter();
-	for (int i = 1; i < Gmax; i++) {
+	for (int i = 1; i <= Gmax; i++) {
 
         gpuErrchk(cudaMemcpy(d_fobj_3_Copy, d_fobj_3, subPopSize*sizeof(float), cudaMemcpyDeviceToDevice));
 		bestIndex_3 = find_best_index(subPopSize, d_fobj_3_Copy);
         gpuErrchk(cudaMemcpy(d_fobj_1_Copy, d_fobj_1, subPopSize*sizeof(float), cudaMemcpyDeviceToDevice));
 		bestIndex_1 = find_best_index(subPopSize, d_fobj_1_Copy);
 
-		generation_new_population_mutation_crossover_selection_evaluation_GPU_rand_1<<<iDivUp(subPopSize,BLOCK_SIZE_POP), BLOCK_SIZE_POP>>>(d_subPop_1,
+		generation_new_population_mutation_crossover_selection_evaluation_GPU_current_to_best<<<iDivUp(subPopSize,BLOCK_SIZE_POP), BLOCK_SIZE_POP>>>(d_subPop_1,
 																				subPopSize, D, d_npop_1, F, CR,
 																				d_minima_1, d_maxima_1, d_fobj_1,
 																				devState_1, d_invK_1, d_localLU_1, d_s_1, bestIndex_1);
@@ -766,13 +803,13 @@ int main()
 		gpuErrchk(cudaDeviceSynchronize());
 #endif
 
-		//find_minimum_GPU(subPopSize, d_fobj_1, &h_best_dev_1[i], &h_best_index_dev_1[i]);
-		//find_minimum_GPU(subPopSize, d_fobj_2, &h_best_dev_2[i], &h_best_index_dev_2[i]);
-		//find_minimum_GPU(subPopSize, d_fobj_3, &h_best_dev_3[i], &h_best_index_dev_3[i]);
-		//printf("aaaa = %f\n", h_best_dev[i]);
+		find_minimum_GPU(subPopSize, d_fobj_1, &h_best_dev_1[i], &h_best_index_dev_1[i]);
+		find_minimum_GPU(subPopSize, d_fobj_2, &h_best_dev_2[i], &h_best_index_dev_2[i]);
+		find_minimum_GPU(subPopSize, d_fobj_3, &h_best_dev_3[i], &h_best_index_dev_3[i]);
 
 #ifdef TIMING
 		//printf("Iteration: %i; best member value: %f - %f - %f: best member index: %i - %i - %i\n", i, h_best_dev_1[i], h_best_dev_2[i], h_best_dev_3[i], h_best_index_dev_1[i], h_best_index_dev_2[i], h_best_index_dev_3[i]);
+		printf("%f - %f - %f\n", h_best_dev_1[i], h_best_dev_2[i], h_best_dev_3[i]);
 #endif
 
 	}

@@ -2,8 +2,8 @@
 /* Definition for user settings */
 /* Definition for a threshold of mutation scheme */
 
-#define NP (int)20
-#define MAXITER (int)400
+#define NP (int)900
+#define MAXITER (int)200
 #define THRESHOLD 0.001
 #define TOLE 0.000001
 
@@ -30,7 +30,7 @@ int main(void)
 
 
 #if 1
-    run_parallel_aeDE(30, MAXITER, D, &problemDefinitions, &resultStorage, TRUE);
+    run_parallel_aeDE(NP, MAXITER, D, &problemDefinitions, &resultStorage, TRUE);
 #endif
 
 #if 0

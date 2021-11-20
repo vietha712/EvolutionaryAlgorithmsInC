@@ -248,6 +248,7 @@ double func(double *A)
     /* Compute stiffness matrix */
     for (int i = 0; i < NUM_OF_ELEMENTS; i++)
     {
+
         x[0] = gCoord[0][element[i][0] - 1];
         x[1] = gCoord[0][element[i][1] - 1];
         y[0] = gCoord[1][element[i][0] - 1];

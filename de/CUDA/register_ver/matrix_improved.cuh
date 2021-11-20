@@ -5,8 +5,8 @@
 #include <stdio.h>
 #include <assert.h>
 
-#define MAX_ROWS 154
-#define MAX_COLS 154
+#define MAX_ROWS 156
+#define MAX_COLS 156
 
 typedef struct Matrix1DTag
 {

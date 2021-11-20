@@ -1,4 +1,4 @@
-#include "planar_truss_72bars.cuh"
+#include "spatial_truss_72bars.cuh"
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
@@ -67,6 +67,7 @@ __host__ __device__ float functional(const float * __restrict A, const int D, fl
     const int bcDOF[12] = {0, 3, 6, 9, 1, 4, 7, 10, 2, 5, 8, 11};
     float bcValue[12] = {0};
     float stress_e[NUM_OF_ELEMENTS] = {0};
+    float elementWeight[NUM_OF_ELEMENTS] = {0};
     Matrix1DT K, F, Te, Te_Transpose, U, invK, Be, disp_e, de_o, temp;
     Matrix1DT matrix2x2_Precomputed, ke2x2, output6x2, output6x6, productOfBe_de;
 
@@ -136,6 +137,7 @@ __host__ __device__ float functional(const float * __restrict A, const int D, fl
 
         le = sqrt( pow((x[1] - x[0]), 2) + pow((y[1] - y[0]), 2) +  pow((z[1] - z[0]), 2));
 
+        elementWeight[i] =  (Ae[i] * rho * le);
 
         //Compute direction cosin
         l_ij = (x[1] - x[0])/le;
@@ -233,22 +235,20 @@ __host__ __device__ float functional(const float * __restrict A, const int D, fl
         stress_e[i] = temp.pMatrix[0];
     }
     /*********************** Check constraints violation ******************************/
-    float Cdisp[NUM_OF_NODES*2], Cstress[NUM_OF_ELEMENTS];
+    float Cdisp[NUM_OF_NODES*DOF], Cstress[NUM_OF_ELEMENTS];
     float sumOfCdisp = 0, sumOfCtress = 0;
 
     //Displacement constraints
     
-    for (int i = 0; i < NUM_OF_NODES*2; i++)
+    for (int i = 0; i < NUM_OF_NODES*DOF; i++)
     {
-        if ((minDisp <= U.pMatrix[i * U.cols]) && (U.pMatrix[i * U.cols] <= maxDisp))
+        if (abs(U.pMatrix[i * U.cols]) <= maxDisp)
         {
             Cdisp[i] = 0;
         }
         else
         {
             Cdisp[i] = fabs(((U.pMatrix[i * U.cols] - maxDisp)/maxDisp));
-            //printf("Disp %d\n", i);
-            //Cdisp[i] = U.pMatrix[i][0]; //aeDE paper
         }
         sumOfCdisp += Cdisp[i];
     }
@@ -256,56 +256,22 @@ __host__ __device__ float functional(const float * __restrict A, const int D, fl
     //Stress constraints
     for (int i = 0; i < NUM_OF_ELEMENTS; i++)
     {
-        if ((minStress <= stress_e[i]) && (stress_e[i] <= maxStress))
+        if (abs(stress_e[i]) <= maxStress)
         {
             Cstress[i] = 0;
         }
         else
         {
             Cstress[i] = fabs((stress_e[i] - maxStress)/maxStress);
-            //printf("Stress %f\n", stress_e[i]);
-            //Cstress[i] = stress_e[i];//aeDE paper
         }
         sumOfCtress += Cstress[i];
     }
     
-    // TODO: calculate total weight
-    float sum1 = 0.0;
-    float sum2 = 0.0;
-    float sum3 = 0.0;
-    float sum4 = 0.0;
-    for (int i = 0; i < 4; i++)
+    //calculate total weight
+    for(int i = 0; i < NUM_OF_ELEMENTS; i++)
     {
-        sum1 = sum1 + (Ae[i] * rho * 60.0);
-        sum2 = sum2 + (Ae[18+i] * rho * 60.0);
-        sum3 = sum3 + (Ae[36+i] * rho * 60.0);
-        sum4 = sum4 + (Ae[54+i] * rho * 60.0);
+        sum += elementWeight[i];
     }
-
-    for (int i = 0; i < 8; i++)
-    {
-        sum1 = sum1 + (Ae[4+i] * rho * 134.164);
-        sum2 = sum2 + (Ae[22+i] * rho * 134.164);
-        sum3 = sum3 + (Ae[40+i] * rho * 134.164);
-        sum4 = sum4 + (Ae[58+i] * rho * 134.164);
-    }
-
-    for (int i = 0; i < 4; i++)
-    {
-        sum1 = sum1 + (Ae[12+i] * rho * 120.0);
-        sum2 = sum2 + (Ae[30+i] * rho * 120.0);
-        sum3 = sum3 + (Ae[48+i] * rho * 120.0);
-        sum4 = sum4 + (Ae[66+i] * rho * 120.0);
-    }
-
-    for (int i = 0; i < 2; i++)
-    {
-        sum1 = sum1 + (Ae[16+i] * rho * 169.7056);
-        sum2 = sum2 + (Ae[34+i] * rho * 169.7056);
-        sum3 = sum3 + (Ae[52+i] * rho * 169.7056);
-        sum4 = sum4 + (Ae[70+i] * rho * 169.7056);
-    }
-    sum = sum1 +sum2+sum3+sum4;
 
     return (sum * pow((sumOfCtress + sumOfCdisp + 1), 1));
 }

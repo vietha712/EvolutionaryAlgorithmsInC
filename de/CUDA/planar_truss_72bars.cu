@@ -55,10 +55,10 @@ __host__ __device__ float function(const float * __restrict A, const int D)
                                       16, 16 };
     
     /****************************************************************************************************************/
-    const int E = 10000000;
-    const int P = 5000;
+    const int E = 10;
+    const int P = 5;
     const float minDisp = -0.25, maxDisp = 0.25; //in
-    const float minStress = -25000, maxStress = 25000;
+    const float minStress = -25, maxStress = 25;
     const float rho = 0.1;
     float sum = 0.0;
     int x[2], y[2], z[2];
@@ -239,7 +239,7 @@ __host__ __device__ float function(const float * __restrict A, const int D)
 
     //Displacement constraints
     
-    for (int i = 0; i < NUM_OF_NODES*2; i++)
+    for (int i = 0; i < NUM_OF_NODES*3; i++)
     {
         if ((minDisp <= U.pMatrix[i * U.cols]) && (U.pMatrix[i * U.cols] <= maxDisp))
         {

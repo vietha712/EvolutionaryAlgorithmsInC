@@ -37,8 +37,9 @@ __host__ __device__ float functional(const float * __restrict A, const int D, fl
     const float minStress = -10, maxStress = 10;
     const float rho = 0.283; //lb/in3
     const float E = 30000;
+    float elementWeight[NUM_OF_ELEMENTS] = {0};
     //const float Px = 1.0; 
-    const float Py = (-10.0); 
+    const float Py = (-10.0);
 
     static const int gCoord1D[2 * NUM_OF_NODES] = { 0   , 240 , 480 , 720 , 960 , 0   , 120 , 240 , 360 , 480 , 600 , 720 , 840 , 960 , 0   , 240 , 480 , 720 , 960 , 0   , 120 , 240 , 360 , 480 , 600 , 720 , 840 , 960 , 0   , 240 , 480 , 720 , 960 , 0   , 120 , 240 , 360 , 480 , 600 , 720 , 840 , 960 , 0  , 240, 480, 720, 960, 0  , 120, 240, 360, 480, 600, 720, 840, 960, 0  , 240, 480, 720, 960, 0  , 120, 240, 360, 480, 600, 720, 840, 960, 0  , 240, 480, 720, 960, 240, 720,
                                        1800, 1800, 1800, 1800, 1800, 1656, 1656, 1656, 1656, 1656, 1656, 1656, 1656, 1656, 1512, 1512, 1512, 1512, 1512, 1368, 1368, 1368, 1368, 1368, 1368, 1368, 1368, 1368, 1224, 1224, 1224, 1224, 1224, 1080, 1080, 1080, 1080, 1080, 1080, 1080, 1080, 1080, 936, 936, 936, 936, 936, 792, 792, 792, 792, 792, 792, 792, 792, 792, 648, 648, 648, 648, 648, 504, 504, 504, 504, 504, 504, 504, 504, 504, 360, 360, 360, 360, 360, 0  , 0   };
@@ -199,6 +200,8 @@ __host__ __device__ float functional(const float * __restrict A, const int D, fl
         y[1] = gCoord1D[77 + element1D[i * 2 + 1] - 1];
 
         le = sqrt( pow((x[1] - x[0]), 2) + pow((y[1] - y[0]), 2) );
+        
+        sum += (Ae[i] * rho * le);
 
         //Compute direction cosin
         l_ij = (x[1] - x[0])/le;
@@ -361,80 +364,16 @@ __host__ __device__ float functional(const float * __restrict A, const int D, fl
     //Stress constraints
     for (int i = 0; i < NUM_OF_ELEMENTS; i++)
     {
-        if ((minStress <= stress_e[i]) && (stress_e[i] <= maxStress))
+        if (abs(stress_e[i]) <= maxStress)
         {
             Cstress[i] = 0;
         }
         else
         {
             Cstress[i] = fabs((stress_e[i] - maxStress)/maxStress);
-            //Cstress[i] = stress_e[i];//aeDE paper
         }
         sumOfCtress += Cstress[i];
     }
-    
-    // calculate total weight
-    float sum1 = 0.0;
-    float sum2 = 0.0;
-    float sum3 = 0.0;
-    float sum4 = 0.0;
-    float sum5 = 0.0;
-    float sum6 = 0.0;
-    float sum7 = 0.0;
-
-   for (int i = 0; i < 4; i++) //length (in)
-    {
-        sum1 = sum1 + (Ae[index_A1[i] - 1] * rho * 240.0);
-        sum2 = sum2 + (Ae[index_A7[i] - 1] * rho * 240.0);
-        sum3 = sum3 + (Ae[index_A12[i] - 1] * rho * 240.0);
-        sum4 = sum4 + (Ae[index_A17[i] - 1] * rho * 240.0);
-        sum5 = sum5 + (Ae[index_A22[i] - 1] * rho * 240.0);
-        sum6 = sum6 + (Ae[index_A27[i] - 1] * rho * 240.0);
-        sum7 = sum7 + (Ae[index_A28[i] - 1] * rho * 432.67);
-    }
-
-    for (int i = 0; i < 5; i++)
-    {
-        sum1 = sum1 + (Ae[index_A2[i] - 1] * rho * 144.0);
-        sum2 = sum2 + (Ae[index_A5[i] - 1] * rho * 144.0);
-        sum3 = sum3 + (Ae[index_A8[i] - 1] * rho * 144.0);
-        sum4 = sum4 + (Ae[index_A10[i] - 1] * rho * 144.0);
-        sum5 = sum5 + (Ae[index_A13[i] - 1] * rho * 144.0);
-        sum6 = sum6 + (Ae[index_A15[i] - 1] * rho * 144.0);
-        sum7 = sum7 + (Ae[index_A18[i] - 1] * rho * 144.0);
-        sum1 = sum1 + (Ae[index_A20[i] - 1] * rho * 144.0);
-        sum2 = sum2 + (Ae[index_A23[i] - 1] * rho * 144.0);
-        sum3 = sum3 + (Ae[index_A25[i] - 1] * rho * 144.0);
-    }
-
-    for (int i = 0; i < 6; i++)
-    {
-        sum1 = sum1 + (Ae[index_A3[i] - 1] * rho * 120.0);
-        sum2 = sum2 + (Ae[index_A9[i] - 1] * rho * 120.0);
-        sum3 = sum3 + (Ae[index_A14[i] - 1] * rho * 120.0);
-        sum4 = sum4 + (Ae[index_A19[i] - 1] * rho * 120.0);
-        sum5 = sum5 + (Ae[index_A24[i] - 1] * rho * 120.0);
-    }
-
-    for (int i = 0; i < 16; i++)
-    {
-        sum1 = sum1 + (Ae[index_A6[i] - 1] * rho * 187.45);
-        sum2 = sum2 + (Ae[index_A11[i] - 1] * rho * 187.45);
-        sum3 = sum3 + (Ae[index_A16[i] - 1] * rho * 187.45);
-        sum4 = sum4 + (Ae[index_A21[i] - 1] * rho * 187.45);
-        sum5 = sum5 + (Ae[index_A26[i] - 1] * rho * 187.45);
-    }
-
-    for (int i = 0; i < 10; i++)
-    {
-        sum1 = sum1 + (Ae[index_A4[i] - 1] * rho * 120.0);
-    }
-
-    for (int i = 0; i < 2; i++)
-    {
-        sum1 = sum1 + (Ae[index_A29[i] - 1] * rho * 360);
-    }
-    sum = sum1+sum2+sum3+sum4+sum5+sum6+sum7;
 
     return (sum * pow((sumOfCtress + 1), 1));
 }

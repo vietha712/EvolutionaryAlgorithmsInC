@@ -110,6 +110,7 @@ double func(double *A)
     const double rho = 0.1;
     extern const int D;
     double sum = 0.0;
+    double elementWeight[NUM_OF_ELEMENTS];
     int x[2], y[2], z[2];
     int index[6];
     double l_ij, m_ij, n_ij, le;
@@ -164,7 +165,7 @@ double func(double *A)
 
         le = sqrt( pow((x[1] - x[0]), 2) + pow((y[1] - y[0]), 2) +  pow((z[1] - z[0]), 2));
 
-
+        elementWeight[i] =  (Ae[i] * rho * le);
         //Compute direction cosin
         l_ij = (x[1] - x[0])/le;
         m_ij = (y[1] - y[0])/le;
@@ -261,12 +262,11 @@ double func(double *A)
         stress_e[i] = temp.pMatrix[0][0];
     }
     /*********************** Check constraints violation ******************************/
-    double Cdisp[NUM_OF_NODES*2], Cstress[NUM_OF_ELEMENTS];
+    double Cdisp[NUM_OF_NODES*3], Cstress[NUM_OF_ELEMENTS];
     double sumOfCdisp = 0, sumOfCtress = 0;
 
     //Displacement constraints
-    
-    for (int i = 0; i < NUM_OF_NODES*2; i++)
+    for (int i = 0; i < NUM_OF_NODES*3; i++)
     {
         if ((minDisp <= U.pMatrix[i][0]) && (U.pMatrix[i][0] <= maxDisp))
         {
@@ -298,42 +298,12 @@ double func(double *A)
     }
     
     // TODO: calculate total weight
-    double sum1 = 0.0;
-    double sum2 = 0.0;
-    double sum3 = 0.0;
-    double sum4 = 0.0;
-    for (int i = 0; i < 4; i++)
+    for(int i = 0; i < NUM_OF_ELEMENTS; i++)
     {
-        sum1 = sum1 + (Ae[i] * rho * 60.0);
-        sum2 = sum2 + (Ae[18+i] * rho * 60.0);
-        sum3 = sum3 + (Ae[36+i] * rho * 60.0);
-        sum4 = sum4 + (Ae[54+i] * rho * 60.0);
+        sum += elementWeight[i];
     }
+    printf("%f\n",sum);
 
-    for (int i = 0; i < 8; i++)
-    {
-        sum1 = sum1 + (Ae[4+i] * rho * 134.164);
-        sum2 = sum2 + (Ae[22+i] * rho * 134.164);
-        sum3 = sum3 + (Ae[40+i] * rho * 134.164);
-        sum4 = sum4 + (Ae[58+i] * rho * 134.164);
-    }
-
-    for (int i = 0; i < 4; i++)
-    {
-        sum1 = sum1 + (Ae[12+i] * rho * 120.0);
-        sum2 = sum2 + (Ae[30+i] * rho * 120.0);
-        sum3 = sum3 + (Ae[48+i] * rho * 120.0);
-        sum4 = sum4 + (Ae[66+i] * rho * 120.0);
-    }
-
-    for (int i = 0; i < 2; i++)
-    {
-        sum1 = sum1 + (Ae[16+i] * rho * 169.7056);
-        sum2 = sum2 + (Ae[34+i] * rho * 169.7056);
-        sum3 = sum3 + (Ae[52+i] * rho * 169.7056);
-        sum4 = sum4 + (Ae[70+i] * rho * 169.7056);
-    }
-    sum = sum1 +sum2+sum3+sum4;
     /* Deallocate */
     deallocateMatrix(&temp);
     deallocateMatrix(&Te);
