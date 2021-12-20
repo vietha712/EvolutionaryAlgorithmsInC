@@ -325,7 +325,7 @@ void run_parallel_aeDE(int numOfPop,
    double **pPop, **pElitePop, **pSubPop2, **pSubNext2, *U2;
    double **pSubPop1, **pSubNext1, *U1;
    double **pSubPop3, **pSubNext3, *U3; 
-   double CR = 0.6, F = 1, minValue = DBL_MAX;
+   double CR = 0.5, F = 0.8, minValue = DBL_MAX;
    double startTime, endTime;
 
    if (s) INITRAND;
@@ -462,8 +462,8 @@ void run_parallel_aeDE(int numOfPop,
          }
 
          applyEliteStrategy(pPop, pSubPop1, pSubPop2, pSubPop3, varDimension, numOfPop);
-         CR -= 0.01;
-         F -= 0.01;
+         //CR -= 0.01;
+         //F -= 0.01;
       }
       
    } /* Main loop */
@@ -486,10 +486,13 @@ void run_parallel_aeDE(int numOfPop,
       }
    }
 
-   for (int copyingInx = 0; copyingInx <= numOfPop; copyingInx++)
+   for (int copyingInx = 0; copyingInx <= varDimension; copyingInx++)
    {
       result->optimizedVars[copyingInx] = pPop[index][copyingInx];
    }
+   printf("Solution:\nValues of variables: ");
+   for (int i = 0; i < varDimension; i++)
+       printf("%.3f\n", pPop[index][i]);
 
 
    result->fitnessVal = pPop[index][varDimension];

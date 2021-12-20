@@ -91,8 +91,6 @@ double findMaxMemInArray(double *array, int length)
     return max;
 }
 
-const double epsilon_1 = 1.0;
-double epsilon_2 = 20.0;
 int E = 10000000; //N/m2
 int P = 100000;
 const int D = 10;
@@ -112,6 +110,7 @@ double func(double *A)
     int index[4];
     int bcDOF[4] = {8, 9, 10, 11}; //reindex in C. Original 9 - 10 - 11 - 12
     double bcValue[4] = {0};
+    double sum_newWay[NUM_OF_ELEMENTS] = {0};
 
     allocateMatrix(&Te, 2, 4);
     allocateMatrix(&Te_Transpose, 4, 2);
@@ -144,7 +143,10 @@ double func(double *A)
         y[0] = gCoord[1][element[i][0] - 1];
         y[1] = gCoord[1][element[i][1] - 1];
 
-        le = sqrt( pow((x[1] - x[0]), 2) + pow((y[1] - y[0]), 2) ); //
+        le = sqrt( pow((x[1] - x[0]), 2) + pow((y[1] - y[0]), 2) ); //length of the bar
+
+        //compute weight
+        sum_newWay[i] = getWeight(A[i], le);
 
         //Compute direction cosin
         l_ij = (x[1] - x[0])/le;
@@ -172,6 +174,7 @@ double func(double *A)
             for (int col_i = 0; col_i < 4; col_i++)
                 K.pMatrix[index[row_i]][index[col_i]] =  K.pMatrix[index[row_i]][index[col_i]] + output4x4.pMatrix[row_i][col_i];
         }
+        //printMatrix(&K);
     } //Pass K
 
     F.pMatrix[3][0] = F.pMatrix[7][0] = -P;
@@ -271,7 +274,7 @@ double func(double *A)
         }
         else
         {
-            Cdisp[i] = fabs(((U.pMatrix[i][0] - maxDisp)/maxDisp));
+            Cdisp[i] = fabs(((U.pMatrix[i][0] - maxDisp)/maxDisp)); //Heuristic dragonfly algorithm 
             //Cdisp[i] = U.pMatrix[i][0]; //aeDE paper
         }
         sumOfCdisp += Cdisp[i];
@@ -293,13 +296,9 @@ double func(double *A)
     }
 #endif
     // calculate total weight
-    for (int i = 0; i < (D-4); i++)
+    for (int i = 0; i < 10; i++)
     {
-        sum += getWeight(A[i], 360);
-    }
-    for (int i = (D-4) ; i < 10; i++)
-    {
-        sum += getWeight(A[i], 509.12);
+        sum += sum_newWay[i];
     }
 #if 0 //MATLAB
     sumOfCdisp = findMaxMemInArray(Cdisp, 10);

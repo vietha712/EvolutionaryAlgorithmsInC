@@ -16,23 +16,56 @@ using namespace thrust;
 #include <time.h>
 #include <fstream>
 
-#define TRUSS_52BARS_PROBLEM
+#define TRUSS_72BARS_PROBLEM
 
 #include "Utilities.cuh"
 #include "TimingGPU.cuh"
-#include "matrix.cuh"
 #ifdef TRUSS_52BARS_PROBLEM
 #include "planar_truss_52bars.cuh"
-#else
+#define OP_DIMENSION 12
+#endif //#ifdef TRUSS_52BARS_PROBLEM
+#ifdef TRUSS_10BARS_PROBLEM
 #include "planar_truss_10bars.cuh"
-#endif
+#define OP_DIMENSION 10
+#endif //#ifdef TRUSS_10BARS_PROBLEM
+#ifdef TRUSS_200BARS_PROBLEM
+#include "planar_truss_200bars.cuh"
+#define OP_DIMENSION 29
+#endif //#ifdef TRUSS_200BARS_PROBLEM
+#ifdef TRUSS_72BARS_PROBLEM
+#include "planar_truss_72bars.cuh"
+#define OP_DIMENSION 16
+#endif //#ifdef TRUSS_72BARS_PROBLEM
 #define pi 3.14159265358979f
 
+#if defined(TRUSS_72BARS_PROBLEM)
+#define BLOCK_SIZE_POP		(16 )
+#define BLOCK_SIZE_RAND1	(64 )
+#define BLOCK_SIZE_RAND2	(64 )
+#define BLOCK_SIZE_UNKN		(OP_DIMENSION)
+#define BLOCK_SIZE			(256)
+#endif
+#if defined(TRUSS_200BARS_PROBLEM)
+#define BLOCK_SIZE_POP		(2 )
+#define BLOCK_SIZE_RAND1	(32 )
+#define BLOCK_SIZE_RAND2	(32 )
+#define BLOCK_SIZE_UNKN		(OP_DIMENSION)
+#define BLOCK_SIZE			(128)
+#endif
+#if defined(TRUSS_52BARS_PROBLEM)
 #define BLOCK_SIZE_POP		(32 )
 #define BLOCK_SIZE_RAND1	(64 )
 #define BLOCK_SIZE_RAND2	(64 )
-#define BLOCK_SIZE_UNKN		(12	)
+#define BLOCK_SIZE_UNKN		(OP_DIMENSION)
 #define BLOCK_SIZE			(256)
+#endif
+#if defined(TRUSS_10BARS_PROBLEM)
+#define BLOCK_SIZE_POP		(32 )
+#define BLOCK_SIZE_RAND1	(128 )
+#define BLOCK_SIZE_RAND2	(128 )
+#define BLOCK_SIZE_UNKN		(OP_DIMENSION)
+#define BLOCK_SIZE			(512)
+#endif
 
 #define PI_f				3.14159265358979f
 
@@ -40,9 +73,7 @@ using namespace thrust;
 //#define SHARED_VERSION
 //#define REGISTER_VERSION
 
-//#define DEBUG
-
-//#define ANTENNAS
+#define DEBUG
 
 // --- REFERENCES
 //     [1] R. Storn and K. Price, “Differential evolution – a simple and efficient heuristic for global optimization over continuous spaces,” 
@@ -115,7 +146,8 @@ __host__ __device__ void fix(float* __restrict X, const int D)
         }
     }
 }
-#else
+#endif
+#ifdef TRUSS_10BARS_PROBLEM
 #define MAXIMA 33.5
 #define MINIMA 1.62
 
@@ -147,110 +179,80 @@ __host__ __device__ void fix(float* __restrict X, const int D)
     }
 }
 #endif
-#if 0
-#ifndef ANTENNAS
-__host__ __device__ float functional(const float * __restrict x, const int D) {
+#ifdef TRUSS_200BARS_PROBLEM
+#define MAXIMA 33.700f
+#define MINIMA 0.100f
 
-	// --- More functionals at https://www.cs.cmu.edu/afs/cs/project/jair/pub/volume24/ortizboyer05a-html/node6.html
-	
-	float sum;
-	// --- De Jong function (hypersphere)
-	//#define MINIMA -5.12
-	//#define MAXIMA  5.12
-	//sum = 0.f;
-	//for (int i=0; i<D; i++) sum = sum + x[i] * x[i];
-	// --- Rosenbrock's saddle - xopt = (1., 1., ..., 1.)
-	//#define MINIMA -2.048
-	//#define MAXIMA  2.048
-	//sum = 0.f;
-	//for (int i = 1; i<D; i++) sum = sum + 100.f * (x[i] - x[i - 1] * x[i - 1]) * (x[i] - x[i - 1] * x[i - 1]) + (x[i - 1] - 1.f) * (x[i - 1] - 1.f);
-	// --- Rastrigin - xopt = (0., 0., ..., 0.)
-	//#define MINIMA -5.12
-	//#define MAXIMA  5.12
-	//sum = 10.f * D;
-	//for (int i = 1; i <= D; i++) sum = sum + (x[i - 1] * x[i - 1] - 10.f * cos(2.f * PI_f * x[i - 1]));
-	// --- Schwfel - xopt(-420.9698, -420.9698, ..., -420.9698)
-	#define MINIMA -500.0
-	#define MAXIMA  500.0
-	sum = 418.9829 * D;
-	for (int i = 1; i <= D; i++) sum = sum + x[i - 1] * sin(sqrt(fabs(x[i - 1])));
+__host__ __device__ void fix(float* __restrict X, const int D)
+{
+	const static float standard_A[30] = {0.100, 0.347, 0.440, 0.539, 0.954, 1.081, 1.174, 1.333, 1.488, 1.764, 2.142, 2.697, 2.800,
+                               3.131, 3.565, 3.813, 4.805, 5.952, 6.572, 7.192, 8.525, 9.300, 10.850,
+                               13.330, 14.290, 17.170, 19.180, 23.680, 28.080, 33.700}; //Standard cross-sectional areas for design variable in^2
 
-	return sum;
+	float temp1, temp2;
+
+    for (int i = 0; i < D; i++)
+    {
+        for (int j = 0; j < 30; j++)
+        {
+            if ((X[i] > standard_A[j]))
+            {
+                continue;
+            }
+            else
+            {
+                temp1 = X[i] - standard_A[j];
+                temp2 = X[i] - standard_A[j - 1];
+                X[i] = (fabs(temp1) <= fabs(temp2)) ? standard_A[j] : standard_A[j - 1];
+                break;
+            }
+        }
+    }
 }
-#else
-#define MINIMA -PI_f
-#define MAXIMA  PI_f
-__host__ __device__ float cheb(const float x, const int N) {
+#endif //#ifdef TRUSS_200BARS_PROBLEM
+#ifdef TRUSS_72BARS_PROBLEM
+#define MAXIMA 33.5f
+#define MINIMA 0.111f
 
-	if (fabs(x) <= 1.f) return cos(N * acos(x));
-	else				return cosh(N * acosh(x));
+__host__ __device__ void fix(float* __restrict X, const int D)
+{
+const static float standard_A[64] = {0.111, 0.141, 0.196, 0.25, 0.307, 0.391, 0.442, 0.563, 0.602, 0.766,
+                       				 0.785, 0.994, 1.00, 1.228, 1.266, 1.457, 1.563,
+                       				 1.62, 1.80, 1.99, 2.13, 2.38, 2.62, 2.63, 2.88, 2.93, 3.09, 3.13, 3.38,
+                       				 3.47, 3.55, 3.63, 3.84, 3.87, 3.88, 4.18, 4.22, 4.49, 4.59, 4.80, 4.97,
+                       				 5.12, 5.74, 7.22, 7.97, 8.53, 9.3, 10.85, 11.50, 13.50, 13.90, 14.20, 15.50, 16.00, 16.90,
+                       				 18.80, 19.90, 22.00, 22.90, 24.5, 26.50, 28.0, 30.00, 33.50}; //Standard cross-sectional areas for design variable in^2
 
+	float temp1, temp2;
+
+    for (int i = 0; i < D; i++)
+    {
+        for (int j = 0; j < 64; j++)
+        {
+            if ((X[i] > standard_A[j]))
+            {
+                continue;
+            }
+            else
+            {
+                temp1 = X[i] - standard_A[j];
+                temp2 = X[i] - standard_A[j - 1];
+                X[i] = (fabs(temp1) <= fabs(temp2)) ? standard_A[j] : standard_A[j - 1];
+                break;
+            }
+        }
+    }
 }
-
-__host__ __device__ float pattern(const float u, const float beta, const int N) {
-
-	const float temp = cheb(u / (beta * 0.3), N);
-
-	return 1.f / sqrt(1.f + 0.1 * fabs(temp) * fabs(temp));
-
-}
-
-__host__ __device__ float functional(float* x, int D, int N, float d, float beta, float Deltau) {
-
-	// --- Functional value
-	float sum = 0.f;
-
-	// --- Spectral variable
-	float u;
-
-	// --- Real and imaginary parts of the array factor and squared absolute value
-	float Fr, Fi, F2, Frref, Firef, F2ref;
-	// --- Reference pattern (ASSUMED real for simplicity!)
-	float R;
-	// --- Maximum absolute value of the array factor
-	float maxF = -FLT_MAX;
-
-	// --- Calculating the array factor and the maximum of its absolute value
-	for (int i = 0; i<N; i++) {
-		u = -beta + i * Deltau;
-		Fr = Fi = 0.;
-		Frref = Firef = 0.;
-
-		for (int j = 0; j<D; j++) {
-			Fr = Fr + cos(j * u * d + x[j]);
-			Fi = Fi + sin(j * u * d + x[j]);
-		}
-		F2 = Fr * Fr + Fi * Fi;
-		//F2ref = (3.f * cos(u / (0.5*beta)) * cos(u / (0.5*beta)) * cos(u / (0.5*beta))) * (3.f * cos(u / (0.5*beta)));
-		F2ref = (3.f * cos((u - 0.1*beta) / (0.5*beta)) * cos((u - 0.1*beta) / (0.5*beta)) * cos((u - 0.1*beta) / (0.5*beta))) * (3.f * cos((u - 0.1*beta) / (0.5*beta)));
-		//F2ref = 2.f * pattern(u, beta, N);
-		//F2ref = F2ref * F2ref;
-		sum = sum + (F2 - F2ref) * (F2 - F2ref);
-	}
-
-	return sum;
-}
-#endif
-#endif
+#endif //#ifdef TRUSS_72BARS_PROBLEM
 /********************************/
 /* POPULATION EVALUATION ON GPU */
 /********************************/
-#ifndef ANTENNAS
 __global__ void evaluation_GPU(const int Np, const int D, float * __restrict pop, float * __restrict fobj) {
 
 	int j = threadIdx.x + blockIdx.x * blockDim.x;
 	fix(&pop[j*D], D);
 	if (j < Np)  fobj[j] = function(&pop[j*D], D);
 }
-#else
-__global__ void evaluation_GPU(int Np, int D, float *pop, float *fobj, int N, float d, float beta, float Deltau) {
-
-	int j = threadIdx.x + blockIdx.x * blockDim.x;
-
-	if (j < Np) fobj[j] = functional(&pop[j*D], D, N, d, beta, Deltau);
-
-}
-#endif
 /**********************************************************/
 /* GENERATE MUTATION INDICES AND CROSS-OVER VALUES ON GPU */
 /**********************************************************/
@@ -542,47 +544,51 @@ void extractElitistPop(const int popSize,
 	}
 }
 
-/**************************/
-/* Construct elitist Pop  */
-/**************************/
-/*
-void constructElitistPop(const int inputSize, 
-					 	 const int D,
-					 	 const int outputSize,
-					 	 float * __restrict pElitistObj_1,
-					 	 float * __restrict pElitistPop_1,
-					 	 float * __restrict pElitistObj_2,
-					 	 float * __restrict pElitistPop_2,
-					 	 float * __restrict pElitistObj_3,
-					 	 float * __restrict pElitistPop_3,
-					 	 float * __restrict pFinalObj,
-					 	 float * __restrict pFinalPop) 
-{
-
-}*/
-
 /********/
 /* MAIN */
 /********/
 int main()
 {
 	// --- Number of individuals in the population (Np >=4 for mutation purposes)
-	int			Np = 1200;
+	int			Np = 600;
 	// --- Number of individuals in the sub population (Np >=4 for mutation purposes)
 	int			subPopSize = Np/3;
 	// --- Number of individuals in the sub population to migrate
 	int			numOfMigratePop = subPopSize/10;
 	// --- Dimensionality of each individual (number of unknowns)
-	int			D = 12;
+	int			D = OP_DIMENSION;
 	// --- Mutation factor (0 < F <= 2). Typically chosen in [0.5, 1], see Ref. [1]
+#if defined(TRUSS_52BARS_PROBLEM)
 	float		F = 0.4f, F2 = 0.2f, F3 = 0.4f;
+	// --- Maximum number of generations
+	int			Gmax = 250;
+	// --- Crossover constant (0 < CR <= 1)
+	float		CR = 0.6f, CR2 = 0.8f, CR3 = 0.8f;
+#endif
+#if defined(TRUSS_72BARS_PROBLEM)
+	float		F = 0.6f, F2 = 0.3f, F3 = 0.4f;
 	// --- Maximum number of generations
 	int			Gmax = 200;
 	// --- Crossover constant (0 < CR <= 1)
-	float		CR = 0.6f, CR2 = 0.8f, CR3 = 0.8f;
-
+	float		CR = 0.7f, CR2 = 0.3f, CR3 = 0.2f;
 	//int *d_best_index;			// --- Device side current optimal member index
-
+#endif
+#if defined(TRUSS_10BARS_PROBLEM)
+	float		F = 0.6f, F2 = 0.3f, F3 = 0.4f;
+	// --- Maximum number of generations
+	int			Gmax = 250;
+	// --- Crossover constant (0 < CR <= 1)
+	float		CR = 0.7f, CR2 = 0.3f, CR3 = 0.2f;
+	//int *d_best_index;			// --- Device side current optimal member index
+#endif
+#if defined(TRUSS_200BARS_PROBLEM)
+	float		F = 0.6f, F2 = 0.3f, F3 = 0.4f;
+	// --- Maximum number of generations
+	int			Gmax = 200;
+	// --- Crossover constant (0 < CR <= 1)
+	float		CR = 0.7f, CR2 = 0.3f, CR3 = 0.2f;
+	//int *d_best_index;			// --- Device side current optimal member index
+#endif
 	float *h_pop_dev_res_1,			// --- Host side population result of GPU computations
 		  *h_pop_dev_res_2,			// --- Host side population result of GPU computations
 		  *h_pop_dev_res_3,			// --- Host side population result of GPU computations
@@ -750,6 +756,7 @@ int main()
 	gpuErrchk(cudaPeekAtLastError());
 	gpuErrchk(cudaDeviceSynchronize());
 #endif
+
 	int bestIndex_3 = 0;
 	TimingGPU timerGPU;
 	timerGPU.StartCounter();
@@ -795,6 +802,7 @@ int main()
 		selection_and_evaluation_GPU << <Grid_1, Block_1 >> >(subPopSize, D, d_subPop_1, d_npop_1, d_fobj_1);
 		selection_and_evaluation_GPU << <Grid_2, Block_2 >> >(subPopSize, D, d_subPop_2, d_npop_2, d_fobj_2);
 		selection_and_evaluation_GPU << <Grid_3, Block_3 >> >(subPopSize, D, d_subPop_3, d_npop_3, d_fobj_3);
+
 		// --- OK NP -> 300 to 1800 -> design vars and obj are matched
 /*
 		if (i == 600)
@@ -812,7 +820,7 @@ int main()
 			return 0;
 		}
 */
-		
+
 #ifdef DEBUG
 		gpuErrchk(cudaPeekAtLastError());
 		gpuErrchk(cudaDeviceSynchronize());

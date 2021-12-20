@@ -2,10 +2,11 @@
 PROJ := main
 
 # Problem
-PROBLEM := planar_truss_10bars
+PROBLEM := spatial_truss_160bars
 
 #Optimization algorithm
 ALGO := parallel_aeDE
+#ALGO := ae_de
 
 #LIB
 LIB := matrix
@@ -48,13 +49,16 @@ $(OUTPUT_PATH)/$(PROBLEM).o: $(PROBLEM).c build-dir
 	@$(CC) -c $(CC_OPT) $< -o $(OUTPUT_PATH)/$(PROBLEM).o
 
 build_test:
-	gcc -Wall -g -pedantic -O3 -o test_main.exe test_main.c planar_truss_52bars.c matrix.c -lm
+	gcc -Wall -g -pedantic -O3 -o test_main.exe test_main.c planar_truss_160bars.c matrix.c -lm
 
 build_de_ten_bars:
 	gcc -Wall -pedantic -O -o de de.c planar_struss_10bars.c matrix.c -lm
 
 build_de_five_two_bars:
 	gcc -Wall -pedantic -O -o de de.c planar_truss_52bars.c matrix.c -lm
+
+build_de_seven_two_bars:
+	gcc -Wall -pedantic -O -o de de.c planar_truss_72bars.c matrix.c -lm
 
 run_truss:
 	./de -N 30 -G 2000 -C 0.6 -F 1.0

@@ -226,7 +226,7 @@ void printMatrix(MatrixT* matrix)
     for(i = 0; i < matrix->rows; ++i)
     {
         for(j = 0; j < matrix->cols; ++j)
-            printf("%.12f ", matrix->pMatrix[i][j]);
+            printf("%.4f ", matrix->pMatrix[i][j]);
         printf("\n");
     }
 }
