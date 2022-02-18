@@ -13,7 +13,7 @@ using namespace thrust;
 #include <time.h>
 #include <fstream>
 
-#define TRUSS_72BARS_PROBLEM
+#define TRUSS_160BARS_PROBLEM
 #define ITERATION 200
 #define NOP 600
 
@@ -462,7 +462,7 @@ void find_minimum_GPU(const int N, float *t, float * __restrict minval, int * __
 /***********************/
 int find_best_index(const int N, float *pObjValue)
 {
-	// --- Wrap raw pointer with a device_ptr 
+	// --- Wrap raw pointer with a device_ptr
 	device_ptr<float> dev_ptr_pObjValue = device_pointer_cast(pObjValue);
 
 	// --- Create the array of indices
@@ -473,6 +473,36 @@ int find_best_index(const int N, float *pObjValue)
 	thrust::sort_by_key(dev_ptr_pObjValue, dev_ptr_pObjValue + N, d_Idx.data()); //Sort main obj pop
 
 	return d_Idx[0];
+}
+
+/*********************************************/
+/* Apply elitist members to input population */
+/*********************************************/
+void applyElitistToPop(float *__restrict elitistObjVal,
+					   float *__restrict elitistPop,
+					   const int elitistPopSize,
+					   float *__restrict copyCurrentObjVal,
+					   float *__restrict actualCurrentObjVal,
+					   float *__restrict actualCurrentPop,
+					   const int popSize,
+					   const int D)
+{
+	// --- Wrap raw pointer with a device_ptr
+	device_ptr<float> dev_ptr_pCurrentObjValue = device_pointer_cast(copyCurrentObjVal);
+
+	// --- Create the array of indices
+	thrust::device_vector<int> d_Idx(popSize, 0);
+	thrust::sequence(d_Idx.begin(), d_Idx.end());
+
+	// --- Sorting with index of objective value
+	thrust::sort_by_key(dev_ptr_pCurrentObjValue, dev_ptr_pCurrentObjValue + popSize, d_Idx.data()); //Sort main obj pop
+
+	for(int i = 0; i < elitistPopSize; i++)
+	{
+		// --- Starting the replacement from the worst member by the best member
+		gpuErrchk(cudaMemcpy(&actualCurrentObjVal[d_Idx[popSize - 1 - i]], &elitistObjVal[i], sizeof(float), cudaMemcpyDeviceToDevice));
+		gpuErrchk(cudaMemcpy(&actualCurrentPop[d_Idx[popSize - 1 - i]*D], &elitistPop[i*D], D*sizeof(float), cudaMemcpyDeviceToDevice));
+	}
 }
 
 /***********************/
@@ -501,10 +531,7 @@ void extractElitistPop(const int popSize,
 	gpuErrchk(cudaMemcpy(&outObjVal[0], &raw_ptr_pObjValue[0], numOfMigratedPop*sizeof(float), cudaMemcpyDeviceToDevice));
 	for(int i = 0; i < numOfMigratedPop; i++)
 	{
-		for(int j = 0; j < D; j++)
-		{
-			gpuErrchk(cudaMemcpy(&outPop[i*D], &inPop[d_Idx[i]*D], D*sizeof(float), cudaMemcpyDeviceToDevice));
-		}
+		gpuErrchk(cudaMemcpy(&outPop[i*D], &inPop[d_Idx[i]*D], D*sizeof(float), cudaMemcpyDeviceToDevice));
 	}
 }
 
@@ -786,17 +813,19 @@ int main()
 			gpuErrchk(cudaMemcpy(&mergeElitistPop[D*numOfMigratePop], elitistSubPop_2, D*numOfMigratePop*sizeof(float), cudaMemcpyDeviceToDevice));
 			gpuErrchk(cudaMemcpy(&mergeElitistPop[D*(numOfMigratePop+numOfMigratePop)], elitistSubPop_3, D*numOfMigratePop*sizeof(float), cudaMemcpyDeviceToDevice));
 			
-			// --- Extract the best out of the merged elitist pop - OK
+			// --- Extract the best out of the merged elitist pop (Reuse elitistObj_1 for storage)
 			extractElitistPop(3*numOfMigratePop, D, numOfMigratePop, mergeElitistObj, mergeElitistPop, elitistObj_1, elitistSubPop_1);
 
 			// --- Apply finalized elitist pop to sub pop
-			int indexForReplacement = subPopSize - numOfMigratePop;
-			gpuErrchk(cudaMemcpy(&d_fobj_1[indexForReplacement], elitistObj_1, numOfMigratePop*sizeof(float), cudaMemcpyDeviceToDevice));
-			gpuErrchk(cudaMemcpy(&d_subPop_1[D*indexForReplacement], elitistSubPop_1, D*numOfMigratePop*sizeof(float), cudaMemcpyDeviceToDevice));
-			gpuErrchk(cudaMemcpy(&d_fobj_2[indexForReplacement], elitistObj_1, numOfMigratePop*sizeof(float), cudaMemcpyDeviceToDevice));
-			gpuErrchk(cudaMemcpy(&d_subPop_2[D*indexForReplacement], elitistSubPop_1, D*numOfMigratePop*sizeof(float), cudaMemcpyDeviceToDevice));
-			gpuErrchk(cudaMemcpy(&d_fobj_3[indexForReplacement], elitistObj_1, numOfMigratePop*sizeof(float), cudaMemcpyDeviceToDevice));
-			gpuErrchk(cudaMemcpy(&d_subPop_3[D*indexForReplacement], elitistSubPop_1, D*numOfMigratePop*sizeof(float), cudaMemcpyDeviceToDevice));
+			// 1. Create copy of current popolation obj value.
+			gpuErrchk(cudaMemcpy(d_fobj_1_Copy, d_fobj_1, subPopSize*sizeof(float), cudaMemcpyDeviceToDevice));
+			gpuErrchk(cudaMemcpy(d_fobj_2_Copy, d_fobj_2, subPopSize*sizeof(float), cudaMemcpyDeviceToDevice));
+			gpuErrchk(cudaMemcpy(d_fobj_3_Copy, d_fobj_3, subPopSize*sizeof(float), cudaMemcpyDeviceToDevice));
+			// 2. Sorting current population.
+			// 3. Apply extracted members to replace the most worst members in current pop.
+			applyElitistToPop(elitistObj_1, elitistSubPop_1, numOfMigratePop, d_fobj_1_Copy, d_fobj_1, d_subPop_1, subPopSize, D);
+			applyElitistToPop(elitistObj_1, elitistSubPop_1, numOfMigratePop, d_fobj_2_Copy, d_fobj_2, d_subPop_2, subPopSize, D);
+			applyElitistToPop(elitistObj_1, elitistSubPop_1, numOfMigratePop, d_fobj_3_Copy, d_fobj_3, d_subPop_3, subPopSize, D);
         }
 #ifdef DEBUG
 		gpuErrchk(cudaPeekAtLastError());
