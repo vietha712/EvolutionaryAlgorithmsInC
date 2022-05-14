@@ -13,7 +13,7 @@ using namespace thrust;
 #include <time.h>
 #include <fstream>
 
-#define TRUSS_160BARS_PROBLEM
+#define TRUSS_200BARS_PROBLEM
 #define ITERATION 200
 #define NOP 600
 
@@ -51,6 +51,14 @@ using namespace thrust;
 
 #define TIMING
 #define DEBUG
+
+float createFloatRand( float min, float max )
+{
+    float scale = rand() / (float) RAND_MAX; /* [0, 1.0] */
+    return min + scale * ( max - min );      /* [min, max] */
+}
+
+
 
 /****************************************/
 /* EVALUATION OF THE OBJECTIVE FUNCTION */
@@ -264,15 +272,15 @@ __global__ void evaluation_GPU(const int Np,
 }
 
 __global__ void generation_new_population_mutation_crossover_selection_evaluation_GPU_current_to_best(
-    float * __restrict__ pop, const int Np, const int D,
-	float * __restrict__ npop, const float F, const float CR,
-	const float * __restrict__ minimum, float * __restrict__ maximum,
-	float * __restrict__ fobj,
-	curandState * __restrict__ state,
-	float * d_invK, // this one and below parameters are used for inverse matrix calc
-	float * d_localLU,
-	float * d_s,
-    const int best_old_gen_ind) 
+	float *__restrict__ pop, const int Np, const int D,
+	float *__restrict__ npop, const float F, const float CR,
+	const float *__restrict__ minimum, float *__restrict__ maximum,
+	float *__restrict__ fobj,
+	curandState *__restrict__ state,
+	float *d_invK, // this one and below parameters are used for inverse matrix calc
+	float *d_localLU,
+	float *d_s,
+	const int best_old_gen_ind)
 {
 
 	int j = threadIdx.x + blockIdx.x * blockDim.x;
@@ -319,7 +327,6 @@ __global__ void generation_new_population_mutation_crossover_selection_evaluatio
 			for (int i = 0; i<D; i++) pop[j*D + i] = npop[j*D + i];
 			fobj[j] = nfobj;
 		}
-
 	}
 }
 
@@ -370,14 +377,12 @@ __global__ void generation_new_population_mutation_crossover_selection_evaluatio
 								 &d_invK[j*TOTAL_DOF*TOTAL_DOF],
 								 &d_localLU[j*TOTAL_DOF*TOTAL_DOF],
 								 &d_s[j*TOTAL_DOF*TOTAL_DOF]);
-
 		float temp = fobj[j];
 
 		if (nfobj < temp) {
 			for (int i = 0; i<D; i++) pop[j*D + i] = npop[j*D + i];
 			fobj[j] = nfobj;
 		}
-
 	}
 }
 
@@ -429,14 +434,12 @@ __global__ void generation_new_population_mutation_crossover_selection_evaluatio
 								 &d_invK[j*TOTAL_DOF*TOTAL_DOF],
 								 &d_localLU[j*TOTAL_DOF*TOTAL_DOF],
 								 &d_s[j*TOTAL_DOF*TOTAL_DOF]);
-
 		float temp = fobj[j];
 
 		if (nfobj < temp) {
 			for (int i = 0; i<D; i++) pop[j*D + i] = npop[j*D + i];
 			fobj[j] = nfobj;
 		}
-
 	}
 }
 
@@ -523,7 +526,9 @@ void extractElitistPop(const int popSize,
 	thrust::device_vector<int> d_Idx(popSize, 0);
 	thrust::sequence(d_Idx.begin(), d_Idx.end());
 
-	// --- Use device_ptr in thrust min_element
+	// --- Create an union of in
+
+	// --- Use device_ptr in sorting objective values
 	thrust::sort_by_key(dev_ptr_inObjValue, dev_ptr_inObjValue + popSize, d_Idx.data()); //Sort main obj pop
 
 	float* raw_ptr_pObjValue = thrust::raw_pointer_cast(&dev_ptr_inObjValue[0]);
@@ -532,6 +537,200 @@ void extractElitistPop(const int popSize,
 	for(int i = 0; i < numOfMigratedPop; i++)
 	{
 		gpuErrchk(cudaMemcpy(&outPop[i*D], &inPop[d_Idx[i]*D], D*sizeof(float), cudaMemcpyDeviceToDevice));
+	}
+}
+
+// --- This function will save the value of trial vectors for later elitist selection
+__global__ void generation_new_population_mutation_crossover_GPU_current_to_best(
+	float *__restrict__ pop, const int Np, const int D,
+	float *__restrict__ npop, const float F, const float CR,
+	const float *__restrict__ minimum, float *__restrict__ maximum,
+	float *__restrict__ fobj,
+	curandState *__restrict__ state,
+	float *d_invK, // this one and below parameters are used for inverse matrix calc
+	float *d_localLU,
+	float *d_s,
+	const int best_old_gen_ind,
+	float *__restrict__ nfobj)
+{
+
+	int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+	// --- Generate mutation indices and crossover values
+
+	int a, b, c;
+	float Rand;
+
+	if (j < Np) {
+
+		// --- Mutation indices
+		do a = Np*(curand_uniform(&state[j]));	while (a == j);
+		do b = Np*(curand_uniform(&state[j]));	while (b == j || b == a);
+		do c = Np*(curand_uniform(&state[j]));	while (c == j || c == a || b == a);
+
+		//// --- Crossover values
+		//Rand = curand_uniform(&state[j]);
+
+		// --- Generate new population
+
+		// --- Mutation and crossover
+		for (int i = 0; i<D; i++) {
+			// --- Crossover values
+			Rand = curand_uniform(&state[j]);
+			if (Rand < CR) npop[j*D+i] = pop[j*D+i] + F*(pop[best_old_gen_ind*D+i] - pop[j*D+i]) + F*(pop[a*D+i]-pop[b*D+i]);
+			else           npop[j*D + i] = pop[j*D + i];
+		}
+
+		// --- Saturation due to constraints on the unknown parameters
+		for (int i = 0; i<D; i++) if (npop[j*D + i]>maximum[i]) npop[j*D + i] = maximum[i];
+		else if (npop[j*D + i]<minimum[i])npop[j*D + i] = minimum[i];
+
+		// --- Evaluation and selection
+		fix(&npop[j*D], D);
+		nfobj[j] = functional(&npop[j*D], D,
+								 &d_invK[j*TOTAL_DOF*TOTAL_DOF],
+								 &d_localLU[j*TOTAL_DOF*TOTAL_DOF],
+								 &d_s[j*TOTAL_DOF*TOTAL_DOF]);
+
+	}
+}
+
+__global__ void generation_new_population_mutation_crossover_GPU_rand_2(
+    float * __restrict__ pop, const int Np, const int D,
+	float * __restrict__ npop, const float F, const float CR,
+	const float * __restrict__ minimum, float * __restrict__ maximum,
+	float * __restrict__ fobj,
+	curandState * __restrict__ state,
+	float * d_invK, // this one and below parameters are used for inverse matrix calc
+	float * d_localLU,
+	float * d_s,
+	float *__restrict__ nfobj) 
+{
+
+	int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+	// --- Generate mutation indices and crossover values
+
+	int a, b, c, d, e;
+	float Rand;
+
+	if (j < Np) {
+
+		// --- Mutation indices
+		do a = Np*(curand_uniform(&state[j]));	while (a == j);
+		do b = Np*(curand_uniform(&state[j]));	while (b == j || b == a);
+		do c = Np*(curand_uniform(&state[j]));	while (c == j || c == a || b == a);
+		do d = Np*(curand_uniform(&state[j]));	while (d == j || d == c || d == b || d == a);
+		do e = Np*(curand_uniform(&state[j]));	while (e == j || e == d || e == c || e == b || e == a);
+
+		// --- Generate new population
+
+		// --- Mutation and crossover
+		for (int i = 0; i < D; i++) {
+			// --- Crossover values
+			Rand = curand_uniform(&state[j]);
+    		if (Rand < CR)	npop[j*D + i] = pop[e*D+i] + F*(pop[a*D+i]+pop[b*D+i] - pop[c*D+i]-pop[d*D+i]);
+		    else			npop[j*D + i] = pop[j*D + i];
+		}
+
+		// --- Saturation due to constraints on the unknown parameters
+		for (int i = 0; i<D; i++) if (npop[j*D + i]>maximum[i]) npop[j*D + i] = maximum[i];
+		else if (npop[j*D + i]<minimum[i])npop[j*D + i] = minimum[i];
+
+		// --- Evaluation and selection
+		fix(&npop[j*D], D);
+		nfobj[j] = functional(&npop[j*D], D,
+								 &d_invK[j*TOTAL_DOF*TOTAL_DOF],
+								 &d_localLU[j*TOTAL_DOF*TOTAL_DOF],
+								 &d_s[j*TOTAL_DOF*TOTAL_DOF]);
+
+	}
+}
+
+__global__ void generation_new_population_mutation_crossover_GPU_best_2(
+    float * __restrict__ pop, const int Np, const int D,
+	float * __restrict__ npop, const float F, const float CR,
+	const float * __restrict__ minimum, float * __restrict__ maximum,
+	float * __restrict__ fobj,
+	curandState * __restrict__ state,
+	float * d_invK, // this one and below parameters are used for inverse matrix calc
+	float * d_localLU,
+	float * d_s,
+    const int best_old_gen_ind,
+	float *__restrict__ nfobj) 
+{
+
+	int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+	// --- Generate mutation indices and crossover values
+
+	int a, b, c, d;
+	float Rand;
+
+	if (j < Np) {
+
+		// --- Mutation indices
+		do a = Np*(curand_uniform(&state[j]));	while (a == j);
+		do b = Np*(curand_uniform(&state[j]));	while (b == j || b == a);
+		do c = Np*(curand_uniform(&state[j]));	while (c == j || c == a || b == a);
+		do d = Np*(curand_uniform(&state[j]));	while (d == j || d == c || d == b || d == a);
+
+
+		// --- Generate new population
+
+		// --- Mutation and crossover
+		for (int i = 0; i < D; i++) {
+			// --- Crossover values
+			Rand = curand_uniform(&state[j]);
+    		if (Rand < CR)	npop[j*D+i] = pop[best_old_gen_ind*D+i] + F*(pop[a*D+i]-pop[b*D+i]) + F*(pop[c*D+i]-pop[d*D+i]);
+		    else			npop[j*D + i] = pop[j*D + i];
+		}
+
+		// --- Saturation due to constraints on the unknown parameters
+		for (int i = 0; i<D; i++) if (npop[j*D + i]>maximum[i]) npop[j*D + i] = maximum[i];
+		else if (npop[j*D + i]<minimum[i])npop[j*D + i] = minimum[i];
+
+		// --- Evaluation and selection
+		fix(&npop[j*D], D);
+		nfobj[j] = functional(&npop[j*D], D,
+								 &d_invK[j*TOTAL_DOF*TOTAL_DOF],
+								 &d_localLU[j*TOTAL_DOF*TOTAL_DOF],
+								 &d_s[j*TOTAL_DOF*TOTAL_DOF]);
+
+	}
+}
+
+/*******************************/
+/* POPULATION SELECTION ON GPU */
+/*******************************/
+// --- This is for one input population
+void performElitistSelection(const int popSize, const int D,
+							 float * __restrict pPop, float * __restrict pNpop, 
+							 float * __restrict pFobj, float * __restrict pNfobj,
+							 float * __restrict pObjMergeBuffer,
+							 float * __restrict pPopMergeBuffer) 
+{
+	// --- Copy to common buffer to perform sorting
+	gpuErrchk(cudaMemcpy(&pObjMergeBuffer[0], &pFobj[0], popSize*sizeof(float), cudaMemcpyDeviceToDevice));
+	gpuErrchk(cudaMemcpy(&pObjMergeBuffer[popSize], &pNfobj[0], popSize*sizeof(float), cudaMemcpyDeviceToDevice));
+	gpuErrchk(cudaMemcpy(&pPopMergeBuffer[0], &pPop[0], D*popSize*sizeof(float), cudaMemcpyDeviceToDevice));
+	gpuErrchk(cudaMemcpy(&pPopMergeBuffer[D*popSize], &pNpop[0], D*popSize*sizeof(float), cudaMemcpyDeviceToDevice));
+	// --- Wrap raw pointer with a device_ptr 
+	device_ptr<float> dev_ptr_pObjMergeBuffer = device_pointer_cast(pObjMergeBuffer);
+
+	// --- Create the array of indices
+	thrust::device_vector<int> d_Idx(2*popSize, 0);
+	thrust::sequence(d_Idx.begin(), d_Idx.end());
+
+	// --- Use device_ptr in thrust
+	thrust::sort_by_key(dev_ptr_pObjMergeBuffer, dev_ptr_pObjMergeBuffer + (2*popSize), d_Idx.data()); //Sort main obj pop
+
+	float* raw_ptr_pObjValue = thrust::raw_pointer_cast(&dev_ptr_pObjMergeBuffer[0]);
+
+	gpuErrchk(cudaMemcpy(&pFobj[0], &raw_ptr_pObjValue[0], popSize*sizeof(float), cudaMemcpyDeviceToDevice));
+	for(int i = 0; i < popSize; i++)
+	{
+		gpuErrchk(cudaMemcpy(&pPop[i*D], &pPopMergeBuffer[d_Idx[i]*D], D*sizeof(float), cudaMemcpyDeviceToDevice));
 	}
 }
 
@@ -608,6 +807,11 @@ int main()
 	  	  *d_fobj_1,				// --- Device side objective function value
 	  	  *d_fobj_2,				// --- Device side objective function value
 	  	  *d_fobj_3,				// --- Device side objective function value
+#if defined (ELITIST_SELECTION)
+		  *d_nfobj_1,				// --- Device side new objective function value
+	  	  *d_nfobj_2,				// --- Device side new objective function value
+	  	  *d_nfobj_3,				// --- Device side new objective function value
+#endif
 	  	  *d_fobj_1_Copy,			// --- Device side objective function value
 	  	  *d_fobj_2_Copy,			// --- Device side objective function value
 	  	  *d_fobj_3_Copy,			// --- Device side objective function value
@@ -617,6 +821,11 @@ int main()
 	  	  *d_minima_1,				// --- Device side minimum constraints vector
 	  	  *d_minima_2,				// --- Device side minimum constraints vector
 	  	  *d_minima_3;				// --- Device side minimum constraints vector
+	int *d_evaluation;
+#if defined (ELITIST_SELECTION)
+	float *d_objMergeBuffer,
+		  *d_popMergerBuffer;
+#endif
 
     float *elitistObj_1,
 		  *elitistSubPop_1,
@@ -643,8 +852,14 @@ int main()
     curandState *devState_1;		// --- Device side random generator state vector
     curandState *devState_2;		// --- Device side random generator state vector
     curandState *devState_3;		// --- Device side random generator state vector
+   
+   	char *ofile = NULL;
+   	FILE *fid;
+
 
 	// --- Device side memory allocations
+	gpuErrchk(cudaMalloc((void**)&d_evaluation, sizeof(int)));
+
 	gpuErrchk(cudaMalloc((void**)&d_subPop_1, D*subPopSize*sizeof(float)));
 	gpuErrchk(cudaMalloc((void**)&d_subPop_2, D*subPopSize*sizeof(float)));
 	gpuErrchk(cudaMalloc((void**)&d_subPop_3, D*subPopSize*sizeof(float)));
@@ -663,10 +878,18 @@ int main()
 	gpuErrchk(cudaMalloc((void**)&d_fobj_1, subPopSize*sizeof(float)));
 	gpuErrchk(cudaMalloc((void**)&d_fobj_2, subPopSize*sizeof(float)));
 	gpuErrchk(cudaMalloc((void**)&d_fobj_3, subPopSize*sizeof(float)));
+#if defined (ELITIST_SELECTION)
+	gpuErrchk(cudaMalloc((void**)&d_nfobj_1, subPopSize*sizeof(float)));
+	gpuErrchk(cudaMalloc((void**)&d_nfobj_2, subPopSize*sizeof(float)));
+	gpuErrchk(cudaMalloc((void**)&d_nfobj_3, subPopSize*sizeof(float)));
+#endif
 	gpuErrchk(cudaMalloc((void**)&d_fobj_1_Copy, subPopSize*sizeof(float)));
 	gpuErrchk(cudaMalloc((void**)&d_fobj_2_Copy, subPopSize*sizeof(float)));
 	gpuErrchk(cudaMalloc((void**)&d_fobj_3_Copy, subPopSize*sizeof(float)));
-
+#if defined (ELITIST_SELECTION)
+	gpuErrchk(cudaMalloc((void**)&d_objMergeBuffer, 2*subPopSize*sizeof(float)));
+	gpuErrchk(cudaMalloc((void**)&d_popMergerBuffer, 2*D*subPopSize*sizeof(float)));
+#endif
 	gpuErrchk(cudaMalloc((void**)&elitistObj_1, numOfMigratePop*sizeof(float)));
 	gpuErrchk(cudaMalloc((void**)&elitistSubPop_1, D*numOfMigratePop*sizeof(float)));
 	gpuErrchk(cudaMalloc((void**)&elitistObj_2, numOfMigratePop*sizeof(float)));
@@ -741,9 +964,9 @@ int main()
 	gpuErrchk(cudaMemcpy(d_minima_3, h_minima, D*sizeof(float), cudaMemcpyHostToDevice));
 
 	// --- Initialize cuRAND states
-	curand_setup_kernel << <iDivUp(D*subPopSize, BLOCK_SIZE), BLOCK_SIZE >> >(devState_1, time(NULL)^15467855035453992347UL);
-	curand_setup_kernel << <iDivUp(D*subPopSize, BLOCK_SIZE), BLOCK_SIZE >> >(devState_2, time(NULL)^17523746072705851699UL);
-	curand_setup_kernel << <iDivUp(D*subPopSize, BLOCK_SIZE), BLOCK_SIZE >> >(devState_3, time(NULL)^12956554043759569915UL);
+	curand_setup_kernel << <iDivUp(D*subPopSize, BLOCK_SIZE), BLOCK_SIZE >> >(devState_1, time(NULL)^12UL);
+	curand_setup_kernel << <iDivUp(D*subPopSize, BLOCK_SIZE), BLOCK_SIZE >> >(devState_2, time(NULL)^21UL);
+	curand_setup_kernel << <iDivUp(D*subPopSize, BLOCK_SIZE), BLOCK_SIZE >> >(devState_3, time(NULL)^321UL);
 
 	// --- Initialize popultion
 	initialize_population_GPU << <Grid_1, Block_1 >> >(d_subPop_1, d_minima_1, d_maxima_1, devState_1, D, subPopSize);
@@ -768,7 +991,7 @@ int main()
     int bestIndex_3 = 0;
 	TimingGPU timerGPU;
 	timerGPU.StartCounter();
-	for (int i = 1; i <= Gmax; i++) {
+	for (int i = 1; i <= Gmax; i++) { 
 
         gpuErrchk(cudaMemcpy(d_fobj_3_Copy, d_fobj_3, subPopSize*sizeof(float), cudaMemcpyDeviceToDevice));
 		bestIndex_3 = find_best_index(subPopSize, d_fobj_3_Copy);
@@ -789,6 +1012,26 @@ int main()
 																				subPopSize, D, d_npop_3, F3, CR3,
 																				d_minima_3, d_maxima_3, d_fobj_3,
 																				devState_3, d_invK_3, d_localLU_3, d_s_3, bestIndex_3);
+
+#if defined (ELITIST_SELECTION)
+		generation_new_population_mutation_crossover_GPU_current_to_best<<<iDivUp(subPopSize,BLOCK_SIZE_POP), BLOCK_SIZE_POP>>>(d_subPop_1,
+																				subPopSize, D, d_npop_1, F, CR,
+																				d_minima_1, d_maxima_1, d_fobj_1,
+																				devState_1, d_invK_1, d_localLU_1, d_s_1, bestIndex_1, d_nfobj_1);
+		performElitistSelection(subPopSize, D, d_subPop_1, d_npop_1, d_fobj_1, d_nfobj_1, d_objMergeBuffer, d_popMergerBuffer);
+
+		generation_new_population_mutation_crossover_GPU_rand_2<<<iDivUp(subPopSize,BLOCK_SIZE_POP), BLOCK_SIZE_POP>>>(d_subPop_2,
+																				subPopSize, D, d_npop_2, F2, CR2,
+																				d_minima_2, d_maxima_2, d_fobj_2,
+																				devState_2, d_invK_2, d_localLU_2, d_s_2, d_nfobj_1);
+		performElitistSelection(subPopSize, D, d_subPop_2, d_npop_2, d_fobj_2, d_nfobj_1, d_objMergeBuffer, d_popMergerBuffer);
+
+		generation_new_population_mutation_crossover_GPU_best_2<<<iDivUp(subPopSize,BLOCK_SIZE_POP), BLOCK_SIZE_POP>>>(d_subPop_3,
+																				subPopSize, D, d_npop_3, F3, CR3,
+																				d_minima_3, d_maxima_3, d_fobj_3,
+																				devState_3, d_invK_3, d_localLU_3, d_s_3, bestIndex_3,d_nfobj_1);
+		performElitistSelection(subPopSize, D, d_subPop_3, d_npop_3, d_fobj_3, d_nfobj_1, d_objMergeBuffer, d_popMergerBuffer);
+#endif
 
         if(i%updateRate == 0)
         {
@@ -827,6 +1070,9 @@ int main()
 			applyElitistToPop(elitistObj_1, elitistSubPop_1, numOfMigratePop, d_fobj_2_Copy, d_fobj_2, d_subPop_2, subPopSize, D);
 			applyElitistToPop(elitistObj_1, elitistSubPop_1, numOfMigratePop, d_fobj_3_Copy, d_fobj_3, d_subPop_3, subPopSize, D);
         }
+			F = createFloatRand(0.3f, 0.5f); CR = createFloatRand(0.8f, 1.0f);
+			F2 = createFloatRand(0.05f, 0.2f); CR2 = createFloatRand(0.2f, 0.4f);
+			F3 = createFloatRand(0.3f, 0.5f); CR3 = createFloatRand(0.1f, 0.3f);
 #ifdef DEBUG
 		gpuErrchk(cudaPeekAtLastError());
 		gpuErrchk(cudaDeviceSynchronize());
@@ -835,6 +1081,20 @@ int main()
 		find_minimum_GPU(subPopSize, d_fobj_1, &h_best_dev_1[i], &h_best_index_dev_1[i]);
 		find_minimum_GPU(subPopSize, d_fobj_2, &h_best_dev_2[i], &h_best_index_dev_2[i]);
 		find_minimum_GPU(subPopSize, d_fobj_3, &h_best_dev_3[i], &h_best_index_dev_3[i]);
+#if 0
+    	gpuErrchk(cudaMemcpy(h_testBufferObj, d_fobj_1, subPopSize*sizeof(float), cudaMemcpyDeviceToHost));
+    	gpuErrchk(cudaMemcpy(&h_testBufferObj[subPopSize], d_fobj_2, subPopSize*sizeof(float), cudaMemcpyDeviceToHost));
+    	gpuErrchk(cudaMemcpy(&h_testBufferObj[subPopSize + subPopSize], d_fobj_3, subPopSize*sizeof(float), cudaMemcpyDeviceToHost));
+
+
+		for (int index = 0; index < Np; index++)
+		{
+			printf("Eval: %d = %.3f || ", index+i*Np-Np, h_testBufferObj[index]);
+			if (0 == index%5)
+				printf("\n");
+		}
+		printf("\n");
+#endif
 
 #ifdef TIMING
 		//printf("Iteration: %i; best member value: %f - %f - %f: best member index: %i - %i - %i\n", i, h_best_dev_1[i], h_best_dev_2[i], h_best_dev_3[i], h_best_index_dev_1[i], h_best_index_dev_2[i], h_best_index_dev_3[i]);
