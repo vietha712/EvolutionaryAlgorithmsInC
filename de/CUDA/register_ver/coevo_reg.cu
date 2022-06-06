@@ -14,9 +14,10 @@ using namespace thrust;
 #include <fstream>
 
 #define ITERATION 150
-#define NOP 300
-#define DIVIDER_FOR_MIGRATION_POP 10
+#define NOP 900
+#define DIVIDER_FOR_MIGRATION_POP 5
 #define PRINT_FOR_DRAWING
+#define NUM_OF_SUBPOP 4
 
 #include "Utilities.cuh"
 #include "TimingGPU.cuh"
@@ -806,32 +807,41 @@ int main(int argc, char **argv)
 	float *d_subPop_1,				// --- Device side sub-population 1
 	  	  *d_subPop_2,				// --- Device side sub-population 2
 	  	  *d_subPop_3,				// --- Device side sub-population 3
+	  	  *d_subPop_4,				// --- Device side sub-population 4
 		  *d_subPop_1_Copy,			// --- Device side sub-population 1
 	  	  *d_subPop_2_Copy,			// --- Device side sub-population 2
 	  	  *d_subPop_3_Copy,			// --- Device side sub-population 3
+	  	  *d_subPop_4_Copy,			// --- Device side sub-population 4
 	  	  *d_npop_1,				// --- Device side new population 1 (trial vectors)
 	  	  *d_npop_2,				// --- Device side new population 2 (trial vectors)
 	  	  *d_npop_3,				// --- Device side new population 3 (trial vectors)
+	  	  *d_npop_4,				// --- Device side new population 4 (trial vectors)
 	  	  *d_Rand_1,				// --- Device side crossover rand vector (uniformly distributed in (0,1))
 	  	  *d_Rand_2,				// --- Device side crossover rand vector (uniformly distributed in (0,1))
 	  	  *d_Rand_3,				// --- Device side crossover rand vector (uniformly distributed in (0,1))
+	  	  *d_Rand_4,				// --- Device side crossover rand vector (uniformly distributed in (0,1))
 	  	  *d_fobj_1,				// --- Device side objective function value
 	  	  *d_fobj_2,				// --- Device side objective function value
 	  	  *d_fobj_3,				// --- Device side objective function value
+	  	  *d_fobj_4,				// --- Device side objective function value
 #if defined (ELITIST_SELECTION)
 		  *d_nfobj_1,				// --- Device side new objective function value
 	  	  *d_nfobj_2,				// --- Device side new objective function value
 	  	  *d_nfobj_3,				// --- Device side new objective function value
+	  	  *d_nfobj_4,				// --- Device side new objective function value
 #endif
 	  	  *d_fobj_1_Copy,			// --- Device side objective function value
 	  	  *d_fobj_2_Copy,			// --- Device side objective function value
 	  	  *d_fobj_3_Copy,			// --- Device side objective function value
+	  	  *d_fobj_4_Copy,			// --- Device side objective function value
 	  	  *d_maxima_1,				// --- Device side maximum constraints vector
 	  	  *d_maxima_2,				// --- Device side maximum constraints vector
 	  	  *d_maxima_3,				// --- Device side maximum constraints vector
+	  	  *d_maxima_4,				// --- Device side maximum constraints vector
 	  	  *d_minima_1,				// --- Device side minimum constraints vector
 	  	  *d_minima_2,				// --- Device side minimum constraints vector
-	  	  *d_minima_3;				// --- Device side minimum constraints vector
+	  	  *d_minima_3,				// --- Device side minimum constraints vector
+	  	  *d_minima_4;				// --- Device side minimum constraints vector
 	int *d_evaluation;
 #if defined (ELITIST_SELECTION)
 	float *d_objMergeBuffer,
@@ -844,25 +854,28 @@ int main(int argc, char **argv)
 		  *elitistSubPop_2,
 		  *elitistObj_3,
 		  *elitistSubPop_3,
-		  *elitistObj,
-		  *elitistSubPop,
+		  *elitistObj_4,
+		  *elitistSubPop_4,
 		  *mergeElitistObj,
 		  *mergeElitistPop;
 
     float	*h_pop_dev_res_1,		// --- Host side population result of GPU computations
 		    *h_pop_dev_res_2,	    // --- Host side population result of GPU computations
 		    *h_pop_dev_res_3,	    // --- Host side population result of GPU computations
+		    *h_pop_dev_res_4,	    // --- Host side population result of GPU computations
 		    *h_best_dev_1,			// --- Host side population best value history of device side
 		    *h_best_dev_2,			// --- Host side population best value history of device side
 		    *h_best_dev_3,			// --- Host side population best value history of device side
+		    *h_best_dev_4,			// --- Host side population best value history of device side
 		    *h_maxima,				// --- Host side maximum constraints vector
 		    *h_minima,
 		    *h_testBufferObj,
 		    *h_testBufferPop;
-	int	  *h_best_index_dev_1, *h_best_index_dev_2, *h_best_index_dev_3;
+	int	  *h_best_index_dev_1, *h_best_index_dev_2, *h_best_index_dev_3, *h_best_index_dev_4;
     curandState *devState_1;		// --- Device side random generator state vector
     curandState *devState_2;		// --- Device side random generator state vector
     curandState *devState_3;		// --- Device side random generator state vector
+    curandState *devState_4;		// --- Device side random generator state vector
    
    	char filename[] = "160bars_1.txt";
 	   char *ofile = NULL;
@@ -901,7 +914,7 @@ int main(int argc, char **argv)
       }
    }
 
-	subPopSize = Np/3;
+	subPopSize = Np/NUM_OF_SUBPOP;
 	// --- Number of individuals in the sub population to migrate
 	numOfMigratePop = subPopSize/DIVIDER_FOR_MIGRATION_POP;
 
@@ -911,29 +924,36 @@ int main(int argc, char **argv)
 	gpuErrchk(cudaMalloc((void**)&d_subPop_1, D*subPopSize*sizeof(float)));
 	gpuErrchk(cudaMalloc((void**)&d_subPop_2, D*subPopSize*sizeof(float)));
 	gpuErrchk(cudaMalloc((void**)&d_subPop_3, D*subPopSize*sizeof(float)));
+	gpuErrchk(cudaMalloc((void**)&d_subPop_4, D*subPopSize*sizeof(float)));
 	gpuErrchk(cudaMalloc((void**)&d_subPop_1_Copy, D*subPopSize*sizeof(float)));
 	gpuErrchk(cudaMalloc((void**)&d_subPop_2_Copy, D*subPopSize*sizeof(float)));
 	gpuErrchk(cudaMalloc((void**)&d_subPop_3_Copy, D*subPopSize*sizeof(float)));
+	gpuErrchk(cudaMalloc((void**)&d_subPop_4_Copy, D*subPopSize*sizeof(float)));
 
 	gpuErrchk(cudaMalloc((void**)&d_npop_1, D*subPopSize*sizeof(float)));
 	gpuErrchk(cudaMalloc((void**)&d_npop_2, D*subPopSize*sizeof(float)));
 	gpuErrchk(cudaMalloc((void**)&d_npop_3, D*subPopSize*sizeof(float)));
+	gpuErrchk(cudaMalloc((void**)&d_npop_4, D*subPopSize*sizeof(float)));
 
 	gpuErrchk(cudaMalloc((void**)&d_Rand_1, D*subPopSize*sizeof(float)));
 	gpuErrchk(cudaMalloc((void**)&d_Rand_2, D*subPopSize*sizeof(float)));
 	gpuErrchk(cudaMalloc((void**)&d_Rand_3, D*subPopSize*sizeof(float)));
+	gpuErrchk(cudaMalloc((void**)&d_Rand_4, D*subPopSize*sizeof(float)));
 
 	gpuErrchk(cudaMalloc((void**)&d_fobj_1, subPopSize*sizeof(float)));
 	gpuErrchk(cudaMalloc((void**)&d_fobj_2, subPopSize*sizeof(float)));
 	gpuErrchk(cudaMalloc((void**)&d_fobj_3, subPopSize*sizeof(float)));
+	gpuErrchk(cudaMalloc((void**)&d_fobj_4, subPopSize*sizeof(float)));
 #if defined (ELITIST_SELECTION)
 	gpuErrchk(cudaMalloc((void**)&d_nfobj_1, subPopSize*sizeof(float)));
 	gpuErrchk(cudaMalloc((void**)&d_nfobj_2, subPopSize*sizeof(float)));
 	gpuErrchk(cudaMalloc((void**)&d_nfobj_3, subPopSize*sizeof(float)));
+	gpuErrchk(cudaMalloc((void**)&d_nfobj_4, subPopSize*sizeof(float)));
 #endif
 	gpuErrchk(cudaMalloc((void**)&d_fobj_1_Copy, subPopSize*sizeof(float)));
 	gpuErrchk(cudaMalloc((void**)&d_fobj_2_Copy, subPopSize*sizeof(float)));
 	gpuErrchk(cudaMalloc((void**)&d_fobj_3_Copy, subPopSize*sizeof(float)));
+	gpuErrchk(cudaMalloc((void**)&d_fobj_4_Copy, subPopSize*sizeof(float)));
 #if defined (ELITIST_SELECTION)
 	gpuErrchk(cudaMalloc((void**)&d_objMergeBuffer, 2*subPopSize*sizeof(float)));
 	gpuErrchk(cudaMalloc((void**)&d_popMergeBuffer, 2*D*subPopSize*sizeof(float)));
@@ -944,10 +964,10 @@ int main(int argc, char **argv)
 	gpuErrchk(cudaMalloc((void**)&elitistSubPop_2, D*numOfMigratePop*sizeof(float)));
 	gpuErrchk(cudaMalloc((void**)&elitistObj_3, numOfMigratePop*sizeof(float)));
 	gpuErrchk(cudaMalloc((void**)&elitistSubPop_3, D*numOfMigratePop*sizeof(float)));
-	gpuErrchk(cudaMalloc((void**)&elitistObj, numOfMigratePop*sizeof(float)));
-	gpuErrchk(cudaMalloc((void**)&elitistSubPop, D*numOfMigratePop*sizeof(float)));
-	gpuErrchk(cudaMalloc((void**)&mergeElitistObj, 3*numOfMigratePop*sizeof(float)));
-	gpuErrchk(cudaMalloc((void**)&mergeElitistPop, 3*D*numOfMigratePop*sizeof(float)));
+	gpuErrchk(cudaMalloc((void**)&elitistObj_4, numOfMigratePop*sizeof(float)));
+	gpuErrchk(cudaMalloc((void**)&elitistSubPop_4, D*numOfMigratePop*sizeof(float)));
+	gpuErrchk(cudaMalloc((void**)&mergeElitistObj, NUM_OF_SUBPOP*numOfMigratePop*sizeof(float)));
+	gpuErrchk(cudaMalloc((void**)&mergeElitistPop, NUM_OF_SUBPOP*D*numOfMigratePop*sizeof(float)));
 
 	gpuErrchk(cudaMalloc((void**)&d_maxima_1, D*sizeof(float)));
 	gpuErrchk(cudaMalloc((void**)&d_minima_1, D*sizeof(float)));
@@ -955,10 +975,13 @@ int main(int argc, char **argv)
 	gpuErrchk(cudaMalloc((void**)&d_minima_2, D*sizeof(float)));
 	gpuErrchk(cudaMalloc((void**)&d_maxima_3, D*sizeof(float)));
 	gpuErrchk(cudaMalloc((void**)&d_minima_3, D*sizeof(float)));
+	gpuErrchk(cudaMalloc((void**)&d_maxima_4, D*sizeof(float)));
+	gpuErrchk(cudaMalloc((void**)&d_minima_4, D*sizeof(float)));
 
 	gpuErrchk(cudaMalloc((void**)&devState_1, D*subPopSize*sizeof(curandState)));
 	gpuErrchk(cudaMalloc((void**)&devState_2, D*subPopSize*sizeof(curandState)));
 	gpuErrchk(cudaMalloc((void**)&devState_3, D*subPopSize*sizeof(curandState)));
+	gpuErrchk(cudaMalloc((void**)&devState_4, D*subPopSize*sizeof(curandState)));
 	
     // --- Device memory for matrix calculation
 	float *d_invK_1, *d_localLU_1, *d_s_1; // --- Device side matrix calculation
@@ -976,16 +999,24 @@ int main(int argc, char **argv)
     cudaMalloc((void**)&d_localLU_3, subPopSize*TOTAL_DOF*TOTAL_DOF*sizeof(float));
     cudaMalloc((void**)&d_s_3, subPopSize*TOTAL_DOF*TOTAL_DOF*sizeof(float));
 
+    float *d_invK_4, *d_localLU_4, *d_s_4; // --- Device side matrix calculation
+	cudaMalloc((void**)&d_invK_4, subPopSize*TOTAL_DOF*TOTAL_DOF*sizeof(float));
+    cudaMalloc((void**)&d_localLU_4, subPopSize*TOTAL_DOF*TOTAL_DOF*sizeof(float));
+    cudaMalloc((void**)&d_s_4, subPopSize*TOTAL_DOF*TOTAL_DOF*sizeof(float));
+
 	// --- Host side memory allocations
 	h_pop_dev_res_1 = (float*)malloc(D*subPopSize*sizeof(float));
 	h_pop_dev_res_2 = (float*)malloc(D*subPopSize*sizeof(float));
 	h_pop_dev_res_3 = (float*)malloc(D*subPopSize*sizeof(float));
+	h_pop_dev_res_4 = (float*)malloc(D*subPopSize*sizeof(float));
 	h_best_dev_1 = (float*)malloc(Gmax*sizeof(float));
 	h_best_dev_2 = (float*)malloc(Gmax*sizeof(float));
 	h_best_dev_3 = (float*)malloc(Gmax*sizeof(float));
+	h_best_dev_4 = (float*)malloc(Gmax*sizeof(float));
 	h_best_index_dev_1 = (int*)malloc(Gmax*sizeof(int));
 	h_best_index_dev_2 = (int*)malloc(Gmax*sizeof(int));
 	h_best_index_dev_3 = (int*)malloc(Gmax*sizeof(int));
+	h_best_index_dev_4 = (int*)malloc(Gmax*sizeof(int));
 	h_maxima = (float*)malloc(D*sizeof(float));
 	h_minima = (float*)malloc(D*sizeof(float));
 	h_testBufferObj = (float*)malloc(Np*sizeof(float));
@@ -998,6 +1029,8 @@ int main(int argc, char **argv)
 	dim3 Block_2(BLOCK_SIZE_UNKN, BLOCK_SIZE_POP);
 	dim3 Grid_3(iDivUp(D, BLOCK_SIZE_UNKN), iDivUp(subPopSize, BLOCK_SIZE_POP));
 	dim3 Block_3(BLOCK_SIZE_UNKN, BLOCK_SIZE_POP);
+	dim3 Grid_4(iDivUp(D, BLOCK_SIZE_UNKN), iDivUp(subPopSize, BLOCK_SIZE_POP));
+	dim3 Block_4(BLOCK_SIZE_UNKN, BLOCK_SIZE_POP);
 
 	// --- Set maxima and minima
 	for (int i = 0; i<D; i++) {
@@ -1010,16 +1043,20 @@ int main(int argc, char **argv)
 	gpuErrchk(cudaMemcpy(d_minima_2, h_minima, D*sizeof(float), cudaMemcpyHostToDevice));
 	gpuErrchk(cudaMemcpy(d_maxima_3, h_maxima, D*sizeof(float), cudaMemcpyHostToDevice));
 	gpuErrchk(cudaMemcpy(d_minima_3, h_minima, D*sizeof(float), cudaMemcpyHostToDevice));
+	gpuErrchk(cudaMemcpy(d_maxima_4, h_maxima, D*sizeof(float), cudaMemcpyHostToDevice));
+	gpuErrchk(cudaMemcpy(d_minima_4, h_minima, D*sizeof(float), cudaMemcpyHostToDevice));
 
 	// --- Initialize cuRAND states
 	curand_setup_kernel << <iDivUp(D*subPopSize, BLOCK_SIZE), BLOCK_SIZE >> >(devState_1, time(NULL)^12UL);
 	curand_setup_kernel << <iDivUp(D*subPopSize, BLOCK_SIZE), BLOCK_SIZE >> >(devState_2, time(NULL)^21UL);
 	curand_setup_kernel << <iDivUp(D*subPopSize, BLOCK_SIZE), BLOCK_SIZE >> >(devState_3, time(NULL)^321UL);
+	curand_setup_kernel << <iDivUp(D*subPopSize, BLOCK_SIZE), BLOCK_SIZE >> >(devState_4, time(NULL)^3121UL);
 
 	// --- Initialize popultion
 	initialize_population_GPU << <Grid_1, Block_1 >> >(d_subPop_1, d_minima_1, d_maxima_1, devState_1, D, subPopSize);
 	initialize_population_GPU << <Grid_2, Block_2 >> >(d_subPop_2, d_minima_2, d_maxima_2, devState_2, D, subPopSize);
 	initialize_population_GPU << <Grid_3, Block_3 >> >(d_subPop_3, d_minima_3, d_maxima_3, devState_3, D, subPopSize);
+	initialize_population_GPU << <Grid_4, Block_4 >> >(d_subPop_4, d_minima_4, d_maxima_4, devState_4, D, subPopSize);
 #ifdef DEBUG
 	gpuErrchk(cudaPeekAtLastError());
 	gpuErrchk(cudaDeviceSynchronize());
@@ -1030,6 +1067,7 @@ int main(int argc, char **argv)
 	evaluation_GPU <<<iDivUp(subPopSize, BLOCK_SIZE), BLOCK_SIZE >>>(subPopSize, D, d_subPop_1, d_fobj_1, d_invK_1, d_localLU_1, d_s_1);
 	evaluation_GPU <<<iDivUp(subPopSize, BLOCK_SIZE), BLOCK_SIZE >>>(subPopSize, D, d_subPop_2, d_fobj_2, d_invK_2, d_localLU_2, d_s_2);
 	evaluation_GPU <<<iDivUp(subPopSize, BLOCK_SIZE), BLOCK_SIZE >>>(subPopSize, D, d_subPop_3, d_fobj_3, d_invK_3, d_localLU_3, d_s_3);
+	evaluation_GPU <<<iDivUp(subPopSize, BLOCK_SIZE), BLOCK_SIZE >>>(subPopSize, D, d_subPop_4, d_fobj_4, d_invK_4, d_localLU_4, d_s_4);
 
 #ifdef DEBUG
 	gpuErrchk(cudaPeekAtLastError());
@@ -1059,14 +1097,20 @@ int main(int argc, char **argv)
 		generation_new_population_mutation_crossover_GPU_rand_2<<<iDivUp(subPopSize,BLOCK_SIZE_POP), BLOCK_SIZE_POP>>>(d_subPop_2,
 																				subPopSize, D, d_npop_2, F2, CR2,
 																				d_minima_2, d_maxima_2, d_fobj_2,
-																				devState_2, d_invK_2, d_localLU_2, d_s_2, d_nfobj_1);
-		performElitistSelection(subPopSize, D, d_subPop_2, d_npop_2, d_fobj_2, d_nfobj_1, d_objMergeBuffer, d_popMergeBuffer);
+																				devState_2, d_invK_2, d_localLU_2, d_s_2, d_nfobj_2);
+		performElitistSelection(subPopSize, D, d_subPop_2, d_npop_2, d_fobj_2, d_nfobj_2, d_objMergeBuffer, d_popMergeBuffer);
+
+		generation_new_population_mutation_crossover_GPU_rand_2<<<iDivUp(subPopSize,BLOCK_SIZE_POP), BLOCK_SIZE_POP>>>(d_subPop_4,
+																				subPopSize, D, d_npop_4, F2, CR2,
+																				d_minima_4, d_maxima_4, d_fobj_4,
+																				devState_4, d_invK_4, d_localLU_4, d_s_4, d_nfobj_4);
+		performElitistSelection(subPopSize, D, d_subPop_4, d_npop_4, d_fobj_4, d_nfobj_4, d_objMergeBuffer, d_popMergeBuffer);
 
 		generation_new_population_mutation_crossover_GPU_best_2<<<iDivUp(subPopSize,BLOCK_SIZE_POP), BLOCK_SIZE_POP>>>(d_subPop_3,
 																				subPopSize, D, d_npop_3, F3, CR3,
 																				d_minima_3, d_maxima_3, d_fobj_3,
-																				devState_3, d_invK_3, d_localLU_3, d_s_3, bestIndex_3,d_nfobj_1);
-		performElitistSelection(subPopSize, D, d_subPop_3, d_npop_3, d_fobj_3, d_nfobj_1, d_objMergeBuffer, d_popMergeBuffer);
+																				devState_3, d_invK_3, d_localLU_3, d_s_3, bestIndex_3,d_nfobj_3);
+		performElitistSelection(subPopSize, D, d_subPop_3, d_npop_3, d_fobj_3, d_nfobj_3, d_objMergeBuffer, d_popMergeBuffer);
 #else
 		generation_new_population_mutation_crossover_selection_evaluation_GPU_current_to_best<<<iDivUp(subPopSize,BLOCK_SIZE_POP), BLOCK_SIZE_POP>>>(d_subPop_1,
 																				subPopSize, D, d_npop_1, F, CR,
@@ -1093,33 +1137,40 @@ int main(int argc, char **argv)
 			gpuErrchk(cudaMemcpy(d_subPop_2_Copy, d_subPop_2, D*subPopSize*sizeof(float), cudaMemcpyDeviceToDevice));
 			gpuErrchk(cudaMemcpy(d_fobj_3_Copy, d_fobj_3, subPopSize*sizeof(float), cudaMemcpyDeviceToDevice));
 			gpuErrchk(cudaMemcpy(d_subPop_3_Copy, d_subPop_3, D*subPopSize*sizeof(float), cudaMemcpyDeviceToDevice));
+			gpuErrchk(cudaMemcpy(d_fobj_4_Copy, d_fobj_4, subPopSize*sizeof(float), cudaMemcpyDeviceToDevice));
+			gpuErrchk(cudaMemcpy(d_subPop_4_Copy, d_subPop_4, D*subPopSize*sizeof(float), cudaMemcpyDeviceToDevice));
 
 			// --- Extract OK match
 			extractElitistPop(subPopSize, D, numOfMigratePop, d_fobj_1_Copy, d_subPop_1_Copy, elitistObj_1, elitistSubPop_1);
 			extractElitistPop(subPopSize, D, numOfMigratePop, d_fobj_2_Copy, d_subPop_2_Copy, elitistObj_2, elitistSubPop_2);
 			extractElitistPop(subPopSize, D, numOfMigratePop, d_fobj_3_Copy, d_subPop_3_Copy, elitistObj_3, elitistSubPop_3);
+			extractElitistPop(subPopSize, D, numOfMigratePop, d_fobj_4_Copy, d_subPop_4_Copy, elitistObj_4, elitistSubPop_4);
 
 			// --- Merge and finalize elitist pop - Success
 			gpuErrchk(cudaMemcpy(mergeElitistObj, elitistObj_1, numOfMigratePop*sizeof(float), cudaMemcpyDeviceToDevice));
 			gpuErrchk(cudaMemcpy(&mergeElitistObj[numOfMigratePop], elitistObj_2, numOfMigratePop*sizeof(float), cudaMemcpyDeviceToDevice));
 			gpuErrchk(cudaMemcpy(&mergeElitistObj[numOfMigratePop + numOfMigratePop], elitistObj_3, numOfMigratePop*sizeof(float), cudaMemcpyDeviceToDevice));
+			gpuErrchk(cudaMemcpy(&mergeElitistObj[numOfMigratePop + numOfMigratePop + numOfMigratePop], elitistObj_4, numOfMigratePop*sizeof(float), cudaMemcpyDeviceToDevice));
 			gpuErrchk(cudaMemcpy(mergeElitistPop, elitistSubPop_1, D*numOfMigratePop*sizeof(float), cudaMemcpyDeviceToDevice));
 			gpuErrchk(cudaMemcpy(&mergeElitistPop[D*numOfMigratePop], elitistSubPop_2, D*numOfMigratePop*sizeof(float), cudaMemcpyDeviceToDevice));
 			gpuErrchk(cudaMemcpy(&mergeElitistPop[D*(numOfMigratePop+numOfMigratePop)], elitistSubPop_3, D*numOfMigratePop*sizeof(float), cudaMemcpyDeviceToDevice));
+			gpuErrchk(cudaMemcpy(&mergeElitistPop[D*(numOfMigratePop+numOfMigratePop+numOfMigratePop)], elitistSubPop_4, D*numOfMigratePop*sizeof(float), cudaMemcpyDeviceToDevice));
 			
 			// --- Extract the best out of the merged elitist pop (Reuse elitistObj_1 for storage)
-			extractElitistPop(3*numOfMigratePop, D, numOfMigratePop, mergeElitistObj, mergeElitistPop, elitistObj_1, elitistSubPop_1);
+			extractElitistPop(NUM_OF_SUBPOP*numOfMigratePop, D, numOfMigratePop, mergeElitistObj, mergeElitistPop, elitistObj_1, elitistSubPop_1);
 
 			// --- Apply finalized elitist pop to sub pop
 			// 1. Create copy of current popolation obj value.
 			gpuErrchk(cudaMemcpy(d_fobj_1_Copy, d_fobj_1, subPopSize*sizeof(float), cudaMemcpyDeviceToDevice));
 			gpuErrchk(cudaMemcpy(d_fobj_2_Copy, d_fobj_2, subPopSize*sizeof(float), cudaMemcpyDeviceToDevice));
 			gpuErrchk(cudaMemcpy(d_fobj_3_Copy, d_fobj_3, subPopSize*sizeof(float), cudaMemcpyDeviceToDevice));
+			gpuErrchk(cudaMemcpy(d_fobj_4_Copy, d_fobj_4, subPopSize*sizeof(float), cudaMemcpyDeviceToDevice));
 			// 2. Sorting current population.
 			// 3. Apply extracted members to replace the most worst members in current pop.
 			applyElitistToPop(elitistObj_1, elitistSubPop_1, numOfMigratePop, d_fobj_1_Copy, d_fobj_1, d_subPop_1, subPopSize, D);
 			applyElitistToPop(elitistObj_1, elitistSubPop_1, numOfMigratePop, d_fobj_2_Copy, d_fobj_2, d_subPop_2, subPopSize, D);
 			applyElitistToPop(elitistObj_1, elitistSubPop_1, numOfMigratePop, d_fobj_3_Copy, d_fobj_3, d_subPop_3, subPopSize, D);
+			applyElitistToPop(elitistObj_1, elitistSubPop_1, numOfMigratePop, d_fobj_4_Copy, d_fobj_4, d_subPop_4, subPopSize, D);
         }
 		F = createFloatRand(0.3f, 0.7f); CR = createFloatRand(0.6f, 1.0f);
 		F2 = createFloatRand(0.05f, 0.5f); CR2 = createFloatRand(0.2f, 0.7f);
@@ -1132,10 +1183,12 @@ int main(int argc, char **argv)
 		find_minimum_GPU(subPopSize, d_fobj_1, &h_best_dev_1[i], &h_best_index_dev_1[i]);
 		find_minimum_GPU(subPopSize, d_fobj_2, &h_best_dev_2[i], &h_best_index_dev_2[i]);
 		find_minimum_GPU(subPopSize, d_fobj_3, &h_best_dev_3[i], &h_best_index_dev_3[i]);
+		find_minimum_GPU(subPopSize, d_fobj_4, &h_best_dev_4[i], &h_best_index_dev_4[i]);
 
     	gpuErrchk(cudaMemcpy(h_testBufferObj, d_fobj_1, subPopSize*sizeof(float), cudaMemcpyDeviceToHost));
     	gpuErrchk(cudaMemcpy(&h_testBufferObj[subPopSize], d_fobj_2, subPopSize*sizeof(float), cudaMemcpyDeviceToHost));
     	gpuErrchk(cudaMemcpy(&h_testBufferObj[subPopSize + subPopSize], d_fobj_3, subPopSize*sizeof(float), cudaMemcpyDeviceToHost));
+    	gpuErrchk(cudaMemcpy(&h_testBufferObj[subPopSize + subPopSize + subPopSize], d_fobj_4, subPopSize*sizeof(float), cudaMemcpyDeviceToHost));
 
 #ifdef PRINT_FOR_DRAWING
 		for (int index = 0; index < Np; index++)
@@ -1164,11 +1217,13 @@ int main(int argc, char **argv)
     find_minimum_GPU(subPopSize, d_fobj_1, &h_best_dev_1[Gmax - 1], &h_best_index_dev_1[Gmax - 1]);
 	find_minimum_GPU(subPopSize, d_fobj_2, &h_best_dev_2[Gmax - 1], &h_best_index_dev_2[Gmax - 1]);
 	find_minimum_GPU(subPopSize, d_fobj_3, &h_best_dev_3[Gmax - 1], &h_best_index_dev_3[Gmax - 1]);
+	find_minimum_GPU(subPopSize, d_fobj_4, &h_best_dev_4[Gmax - 1], &h_best_index_dev_4[Gmax - 1]);
     gpuErrchk(cudaMemcpy(h_pop_dev_res_1, d_subPop_1, D*subPopSize*sizeof(float), cudaMemcpyDeviceToHost));
     gpuErrchk(cudaMemcpy(h_pop_dev_res_2, d_subPop_2, D*subPopSize*sizeof(float), cudaMemcpyDeviceToHost));
     gpuErrchk(cudaMemcpy(h_pop_dev_res_3, d_subPop_3, D*subPopSize*sizeof(float), cudaMemcpyDeviceToHost));
+    gpuErrchk(cudaMemcpy(h_pop_dev_res_4, d_subPop_4, D*subPopSize*sizeof(float), cudaMemcpyDeviceToHost));
 
-	printf("Obj = %.3f - Obj = %.3f - Obj = %.3f\n", h_best_dev_1[Gmax - 1], h_best_dev_2[Gmax - 1], h_best_dev_3[Gmax - 1]);
+	printf("Obj = %.3f - Obj = %.3f - Obj = %.3f - Obj = %.3f\n", h_best_dev_1[Gmax - 1], h_best_dev_2[Gmax - 1], h_best_dev_3[Gmax - 1], h_best_dev_4[Gmax - 1]);
 	for(int x = 0; x < D; x++)
 	{
 		fprintf(fid, "var[%d] = %.3f\n", x, h_pop_dev_res_1[h_best_index_dev_1[Gmax - 1]*D + x]);
@@ -1180,6 +1235,10 @@ int main(int argc, char **argv)
 	for(int x = 0; x < D; x++)
 	{
 		printf("var[%d] = %.3f\n", x, h_pop_dev_res_3[h_best_index_dev_3[Gmax - 1]*D + x]);
+	}
+	for(int x = 0; x < D; x++)
+	{
+		printf("var[%d] = %.3f\n", x, h_pop_dev_res_4[h_best_index_dev_4[Gmax - 1]*D + x]);
 	}
 #ifdef PRINT_FOR_DRAWING
 	fprintf(fid, "\n");
