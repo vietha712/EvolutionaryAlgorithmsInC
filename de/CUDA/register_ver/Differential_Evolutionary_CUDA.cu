@@ -664,10 +664,17 @@ void find_minimum_GPU(const int N, float *t, float * __restrict minval, int * __
 
 }
 
+int usage(char *str)
+{
+   fprintf(stderr,"Usage: %s [-h] [-u] [-s] [-N NP (20*D)] ", str);
+   fprintf(stderr,"[-G Gmax (1000)]\n");
+   fprintf(stderr,"\t[-o <outputfile>]\n\n");
+   exit(-1);
+}
 /********/
 /* MAIN */
 /********/
-int main()
+int main(int argc, char **argv)
 {
 	// --- Number of individuals in the population (Np >=4 for mutation purposes)
 	int			Np = 100;
@@ -755,6 +762,42 @@ int main()
 	gpuErrchk(cudaMemcpy(d_maxima, h_maxima, D*sizeof(float), cudaMemcpyHostToDevice));
 	gpuErrchk(cudaMemcpy(d_minima, h_minima, D*sizeof(float), cudaMemcpyHostToDevice));
 
+	char *ofile = NULL;
+   	FILE *fid;
+
+   /* Parse command line arguments given by user	*/
+   for (int index_1 = 1; index_1 < argc; index_1++)
+   {
+      if (argv[index_1][0] != '-')
+         usage(argv[0]);
+
+      char c = argv[index_1][1];
+
+      switch (c)
+      {
+         case 'N':
+                if (++index_1 >= argc)
+                   usage(argv[0]);
+
+		        Np = atoi(argv[index_1]);
+                break;
+         case 'G':
+                if (++index_1 >= argc)
+                   usage(argv[0]);
+
+                Gmax = atoi(argv[index_1]);
+                break;
+         case 'o':
+                if (++index_1 >= argc)
+                   usage(argv[0]);
+
+		        ofile = argv[index_1];
+                break;
+         default:
+		usage(argv[0]);
+      }
+   }
+
 	// --- Initialize cuRAND states
 	curand_setup_kernel << <iDivUp(D*Np, BLOCK_SIZE), BLOCK_SIZE >> >(devState, time(NULL));
 
@@ -780,7 +823,7 @@ int main()
 	gpuErrchk(cudaPeekAtLastError());
 	gpuErrchk(cudaDeviceSynchronize());
 #endif
-
+	if ((fid=(FILE *)fopen(ofile,"a")) == NULL) fprintf(stderr,"Error in opening file %s\n\n",ofile);
 	TimingGPU timerGPU;
 	timerGPU.StartCounter();
 	for (int i = 1; i < Gmax; i++) {

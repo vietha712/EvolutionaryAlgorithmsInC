@@ -13,9 +13,10 @@ using namespace thrust;
 #include <time.h>
 #include <fstream>
 
-#define TRUSS_200BARS_PROBLEM
-#define ITERATION 200
-#define NOP 600
+#define ITERATION 150
+#define NOP 300
+#define DIVIDER_FOR_MIGRATION_POP 2
+#define PRINT_FOR_DRAWING
 
 #include "Utilities.cuh"
 #include "TimingGPU.cuh"
@@ -51,6 +52,8 @@ using namespace thrust;
 
 #define TIMING
 #define DEBUG
+
+#define ELITIST_SELECTION
 
 float createFloatRand( float min, float max )
 {
@@ -591,7 +594,6 @@ __global__ void generation_new_population_mutation_crossover_GPU_current_to_best
 								 &d_invK[j*TOTAL_DOF*TOTAL_DOF],
 								 &d_localLU[j*TOTAL_DOF*TOTAL_DOF],
 								 &d_s[j*TOTAL_DOF*TOTAL_DOF]);
-
 	}
 }
 
@@ -734,22 +736,32 @@ void performElitistSelection(const int popSize, const int D,
 	}
 }
 
+int usage(char *str)
+{
+   fprintf(stderr,"Usage: %s [-h] [-u] [-s] [-N NP (20*D)] ", str);
+   fprintf(stderr,"[-G Gmax (1000)]\n");
+   fprintf(stderr,"\t[-o <outputfile>]\n\n");
+   exit(-1);
+}
+
+
 /********/
 /* MAIN */
 /********/
-int main()
+int main(int argc, char **argv)
 {
 	// --- Number of individuals in the population (Np >=4 for mutation purposes)
 	int			Np = NOP;
 	// --- Number of individuals in the sub population (Np >=4 for mutation purposes)
 	int			subPopSize = Np/3;
+	int migrationRate = DIVIDER_FOR_MIGRATION_POP;
 	// --- Number of individuals in the sub population to migrate
-	int			numOfMigratePop = subPopSize/10;
+	int			numOfMigratePop = subPopSize/migrationRate;
 	// --- Dimensionality of each individual (number of unknowns)
 	int			D = OP_DIMENSION;
 
     // --- the rate to perform elitist strategy
-	int		    updateRate = 10; // --- Need to be tune depend on Gmax. Tradeoff with performance
+	int		    updateRate = 1; // --- Need to be tune depend on Gmax. Tradeoff with performance
 #if defined(TRUSS_10BARS_PROBLEM)
 	float		F = 0.6f, F2 = 0.3f, F3 = 0.4f;
 	// --- Maximum number of generations
@@ -824,7 +836,7 @@ int main()
 	int *d_evaluation;
 #if defined (ELITIST_SELECTION)
 	float *d_objMergeBuffer,
-		  *d_popMergerBuffer;
+		  *d_popMergeBuffer;
 #endif
 
     float *elitistObj_1,
@@ -853,9 +865,53 @@ int main()
     curandState *devState_2;		// --- Device side random generator state vector
     curandState *devState_3;		// --- Device side random generator state vector
    
-   	char *ofile = NULL;
+   	char filename[] = "160bars_1.txt";
+	   char *ofile = NULL;
    	FILE *fid;
 
+   /* Parse command line arguments given by user	*/
+   for (int index_1 = 1; index_1 < argc; index_1++)
+   {
+      if (argv[index_1][0] != '-')
+         usage(argv[0]);
+
+      char c = argv[index_1][1];
+
+      switch (c)
+      {
+         case 'N':
+                if (++index_1 >= argc)
+                   usage(argv[0]);
+
+		        Np = atoi(argv[index_1]);
+                break;
+         case 'G':
+                if (++index_1 >= argc)
+                   usage(argv[0]);
+
+                Gmax = atoi(argv[index_1]);
+                break;
+         case 'M':
+                if (++index_1 >= argc)
+                   usage(argv[0]);
+
+		        migrationRate = atoi(argv[index_1]);
+                break;
+         case 'o':
+                if (++index_1 >= argc)
+                   usage(argv[0]);
+
+		        ofile = argv[index_1];
+                break;
+         default:
+		usage(argv[0]);
+      }
+   }
+
+	subPopSize = Np/3;
+	// --- Number of individuals in the sub population to migrate
+	numOfMigratePop = subPopSize/migrationRate;
+	printf("SubPopSize = %d - Migration Rate: %d\n", subPopSize, numOfMigratePop);
 
 	// --- Device side memory allocations
 	gpuErrchk(cudaMalloc((void**)&d_evaluation, sizeof(int)));
@@ -888,7 +944,7 @@ int main()
 	gpuErrchk(cudaMalloc((void**)&d_fobj_3_Copy, subPopSize*sizeof(float)));
 #if defined (ELITIST_SELECTION)
 	gpuErrchk(cudaMalloc((void**)&d_objMergeBuffer, 2*subPopSize*sizeof(float)));
-	gpuErrchk(cudaMalloc((void**)&d_popMergerBuffer, 2*D*subPopSize*sizeof(float)));
+	gpuErrchk(cudaMalloc((void**)&d_popMergeBuffer, 2*D*subPopSize*sizeof(float)));
 #endif
 	gpuErrchk(cudaMalloc((void**)&elitistObj_1, numOfMigratePop*sizeof(float)));
 	gpuErrchk(cudaMalloc((void**)&elitistSubPop_1, D*numOfMigratePop*sizeof(float)));
@@ -990,14 +1046,36 @@ int main()
     int bestIndex_1 = 0;
     int bestIndex_3 = 0;
 	TimingGPU timerGPU;
+    if ((fid=(FILE *)fopen(ofile,"a")) == NULL)
+         fprintf(stderr,"Error in opening file %s\n\n",ofile);
 	timerGPU.StartCounter();
 	for (int i = 1; i <= Gmax; i++) { 
-
+		if (i == 10) updateRate = 2;
+		if (i == 20) updateRate = 5;
         gpuErrchk(cudaMemcpy(d_fobj_3_Copy, d_fobj_3, subPopSize*sizeof(float), cudaMemcpyDeviceToDevice));
 		bestIndex_3 = find_best_index(subPopSize, d_fobj_3_Copy);
         gpuErrchk(cudaMemcpy(d_fobj_1_Copy, d_fobj_1, subPopSize*sizeof(float), cudaMemcpyDeviceToDevice));
 		bestIndex_1 = find_best_index(subPopSize, d_fobj_1_Copy);
 
+#if defined (ELITIST_SELECTION)
+		generation_new_population_mutation_crossover_GPU_current_to_best<<<iDivUp(subPopSize,BLOCK_SIZE_POP), BLOCK_SIZE_POP>>>(d_subPop_1,
+																				subPopSize, D, d_npop_1, F, CR,
+																				d_minima_1, d_maxima_1, d_fobj_1,
+																				devState_1, d_invK_1, d_localLU_1, d_s_1, bestIndex_1, d_nfobj_1);
+		performElitistSelection(subPopSize, D, d_subPop_1, d_npop_1, d_fobj_1, d_nfobj_1, d_objMergeBuffer, d_popMergeBuffer);
+
+		generation_new_population_mutation_crossover_GPU_rand_2<<<iDivUp(subPopSize,BLOCK_SIZE_POP), BLOCK_SIZE_POP>>>(d_subPop_2,
+																				subPopSize, D, d_npop_2, F2, CR2,
+																				d_minima_2, d_maxima_2, d_fobj_2,
+																				devState_2, d_invK_2, d_localLU_2, d_s_2, d_nfobj_2);
+		performElitistSelection(subPopSize, D, d_subPop_2, d_npop_2, d_fobj_2, d_nfobj_2, d_objMergeBuffer, d_popMergeBuffer);
+
+		generation_new_population_mutation_crossover_GPU_best_2<<<iDivUp(subPopSize,BLOCK_SIZE_POP), BLOCK_SIZE_POP>>>(d_subPop_3,
+																				subPopSize, D, d_npop_3, F3, CR3,
+																				d_minima_3, d_maxima_3, d_fobj_3,
+																				devState_3, d_invK_3, d_localLU_3, d_s_3, bestIndex_3,d_nfobj_3);
+		performElitistSelection(subPopSize, D, d_subPop_3, d_npop_3, d_fobj_3, d_nfobj_3, d_objMergeBuffer, d_popMergeBuffer);
+#else
 		generation_new_population_mutation_crossover_selection_evaluation_GPU_current_to_best<<<iDivUp(subPopSize,BLOCK_SIZE_POP), BLOCK_SIZE_POP>>>(d_subPop_1,
 																				subPopSize, D, d_npop_1, F, CR,
 																				d_minima_1, d_maxima_1, d_fobj_1,
@@ -1012,25 +1090,6 @@ int main()
 																				subPopSize, D, d_npop_3, F3, CR3,
 																				d_minima_3, d_maxima_3, d_fobj_3,
 																				devState_3, d_invK_3, d_localLU_3, d_s_3, bestIndex_3);
-
-#if defined (ELITIST_SELECTION)
-		generation_new_population_mutation_crossover_GPU_current_to_best<<<iDivUp(subPopSize,BLOCK_SIZE_POP), BLOCK_SIZE_POP>>>(d_subPop_1,
-																				subPopSize, D, d_npop_1, F, CR,
-																				d_minima_1, d_maxima_1, d_fobj_1,
-																				devState_1, d_invK_1, d_localLU_1, d_s_1, bestIndex_1, d_nfobj_1);
-		performElitistSelection(subPopSize, D, d_subPop_1, d_npop_1, d_fobj_1, d_nfobj_1, d_objMergeBuffer, d_popMergerBuffer);
-
-		generation_new_population_mutation_crossover_GPU_rand_2<<<iDivUp(subPopSize,BLOCK_SIZE_POP), BLOCK_SIZE_POP>>>(d_subPop_2,
-																				subPopSize, D, d_npop_2, F2, CR2,
-																				d_minima_2, d_maxima_2, d_fobj_2,
-																				devState_2, d_invK_2, d_localLU_2, d_s_2, d_nfobj_1);
-		performElitistSelection(subPopSize, D, d_subPop_2, d_npop_2, d_fobj_2, d_nfobj_1, d_objMergeBuffer, d_popMergerBuffer);
-
-		generation_new_population_mutation_crossover_GPU_best_2<<<iDivUp(subPopSize,BLOCK_SIZE_POP), BLOCK_SIZE_POP>>>(d_subPop_3,
-																				subPopSize, D, d_npop_3, F3, CR3,
-																				d_minima_3, d_maxima_3, d_fobj_3,
-																				devState_3, d_invK_3, d_localLU_3, d_s_3, bestIndex_3,d_nfobj_1);
-		performElitistSelection(subPopSize, D, d_subPop_3, d_npop_3, d_fobj_3, d_nfobj_1, d_objMergeBuffer, d_popMergerBuffer);
 #endif
 
         if(i%updateRate == 0)
@@ -1070,9 +1129,9 @@ int main()
 			applyElitistToPop(elitistObj_1, elitistSubPop_1, numOfMigratePop, d_fobj_2_Copy, d_fobj_2, d_subPop_2, subPopSize, D);
 			applyElitistToPop(elitistObj_1, elitistSubPop_1, numOfMigratePop, d_fobj_3_Copy, d_fobj_3, d_subPop_3, subPopSize, D);
         }
-			F = createFloatRand(0.3f, 0.5f); CR = createFloatRand(0.8f, 1.0f);
-			F2 = createFloatRand(0.05f, 0.2f); CR2 = createFloatRand(0.2f, 0.4f);
-			F3 = createFloatRand(0.3f, 0.5f); CR3 = createFloatRand(0.1f, 0.3f);
+		F = createFloatRand(0.3f, 0.7f); CR = createFloatRand(0.6f, 1.0f);
+		F2 = createFloatRand(0.05f, 0.5f); CR2 = createFloatRand(0.2f, 0.7f);
+		F3 = createFloatRand(0.2f, 0.7f); CR3 = createFloatRand(0.1f, 0.6f);
 #ifdef DEBUG
 		gpuErrchk(cudaPeekAtLastError());
 		gpuErrchk(cudaDeviceSynchronize());
@@ -1081,29 +1140,34 @@ int main()
 		find_minimum_GPU(subPopSize, d_fobj_1, &h_best_dev_1[i], &h_best_index_dev_1[i]);
 		find_minimum_GPU(subPopSize, d_fobj_2, &h_best_dev_2[i], &h_best_index_dev_2[i]);
 		find_minimum_GPU(subPopSize, d_fobj_3, &h_best_dev_3[i], &h_best_index_dev_3[i]);
-#if 0
+
     	gpuErrchk(cudaMemcpy(h_testBufferObj, d_fobj_1, subPopSize*sizeof(float), cudaMemcpyDeviceToHost));
     	gpuErrchk(cudaMemcpy(&h_testBufferObj[subPopSize], d_fobj_2, subPopSize*sizeof(float), cudaMemcpyDeviceToHost));
     	gpuErrchk(cudaMemcpy(&h_testBufferObj[subPopSize + subPopSize], d_fobj_3, subPopSize*sizeof(float), cudaMemcpyDeviceToHost));
 
-
+#ifdef PRINT_FOR_DRAWING
 		for (int index = 0; index < Np; index++)
 		{
-			printf("Eval: %d = %.3f || ", index+i*Np-Np, h_testBufferObj[index]);
-			if (0 == index%5)
-				printf("\n");
+			fprintf(fid, "%.3f\n",h_testBufferObj[index]);
 		}
-		printf("\n");
+#else
+		for (int index = 0; index < Np; index+=3)
+		{
+			fprintf(fid,"No. %d: %.3f - No.%d: %.3f - No. %d: %.3f\n", index+i*Np-Np,     h_testBufferObj[index], 
+																	   index+i*Np-Np + 1, h_testBufferObj[index+1], 
+																	   index+i*Np-Np + 2, h_testBufferObj[index+2]);
+		}
 #endif
 
+#ifndef PRINT_FOR_DRAWING
 #ifdef TIMING
 		//printf("Iteration: %i; best member value: %f - %f - %f: best member index: %i - %i - %i\n", i, h_best_dev_1[i], h_best_dev_2[i], h_best_dev_3[i], h_best_index_dev_1[i], h_best_index_dev_2[i], h_best_index_dev_3[i]);
-		printf("%f - %f - %f\n", h_best_dev_1[i], h_best_dev_2[i], h_best_dev_3[i]);
+		fprintf(fid, "%f - %f - %f at %d\n", h_best_dev_1[i], h_best_dev_2[i], h_best_dev_3[i], i);
 #endif
-
+#endif
 	}
 #ifdef TIMING
-	printf("Total timing = %f [s]\n", timerGPU.GetCounter() * 0.001);
+	fprintf(fid, "Total timing = %f [s]\n", timerGPU.GetCounter() * 0.001);
 #endif// TIMING
     find_minimum_GPU(subPopSize, d_fobj_1, &h_best_dev_1[Gmax - 1], &h_best_index_dev_1[Gmax - 1]);
 	find_minimum_GPU(subPopSize, d_fobj_2, &h_best_dev_2[Gmax - 1], &h_best_index_dev_2[Gmax - 1]);
@@ -1115,7 +1179,7 @@ int main()
 	printf("Obj = %.3f - Obj = %.3f - Obj = %.3f\n", h_best_dev_1[Gmax - 1], h_best_dev_2[Gmax - 1], h_best_dev_3[Gmax - 1]);
 	for(int x = 0; x < D; x++)
 	{
-		printf("var[%d] = %.3f\n", x, h_pop_dev_res_1[h_best_index_dev_1[Gmax - 1]*D + x]);
+		fprintf(fid, "var[%d] = %.3f\n", x, h_pop_dev_res_1[h_best_index_dev_1[Gmax - 1]*D + x]);
 	}
 	for(int x = 0; x < D; x++)
 	{
@@ -1125,5 +1189,14 @@ int main()
 	{
 		printf("var[%d] = %.3f\n", x, h_pop_dev_res_3[h_best_index_dev_3[Gmax - 1]*D + x]);
 	}
+#ifdef PRINT_FOR_DRAWING
+	fprintf(fid, "\n");
+	for (int index = 0; index < Np*ITERATION; index++)
+	{
+		fprintf(fid, "%d\n", index);
+	}
+
+#endif
+	fclose(fid);
 	return 0;
 }
