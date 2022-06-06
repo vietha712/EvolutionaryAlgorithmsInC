@@ -1,1 +1,1 @@
-nvcc -rdc=true -o 10bars_coevo coevo_reg.cu TimingGPU.cu Utilities.cu matrix_improved.cu planar_truss_10bars.cu
+nvcc -DTRUSS_10BARS_PROBLEM -rdc=true -o 10bars_coevo coevo_reg.cu TimingGPU.cu Utilities.cu matrix_improved.cu planar_truss_10bars.cu
